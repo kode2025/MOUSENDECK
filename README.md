@@ -888,6 +888,11 @@ port toward you, camera edge pointing away.
 - **tilt the far edge up and down** → cursor moves up and down
 - **swivel left and right** → cursor moves across
 
+On an **iPad** you are asked to stand the device upright first, because it has
+to come out of the landscape you were just using it in. On a **phone** that
+step is skipped — the phone layout is already portrait, so asking would be a
+screen that exists only to be dismissed.
+
 The app shows a diagram, then **waits** — it reads the phone's own gravity
 vector and doesn't continue until you're actually holding it that way. An
 orientation media query cannot tell "flat" from "upright", so gravity is what

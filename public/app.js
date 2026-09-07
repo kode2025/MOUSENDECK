@@ -1348,18 +1348,26 @@ async function toggleAir() {
   // upright (which the device can actually detect), then lay it flat like a
   // remote (which it cannot — flat reads as neither portrait nor landscape,
   // because gravity is along Z and there is nothing left to resolve it with).
-  showAirHow('upright');
-  await waitForPosture('portrait', (skip) => {
-    // Gravity never turned up. Say so and let them carry on by hand rather
-    // than staring at a screen that will never advance.
-    $('airhow-p').textContent =
-      'I cannot read this device\u2019s motion sensor, so I cannot tell how you '
-      + 'are holding it. Hold the phone upright, then continue.';
-    $('airhow-go').textContent = 'Continue';
-    $('airhow-go').hidden = false;
-    $('airhow-go').addEventListener('click', skip, { once: true });
-  });
-  if ($('airhow').hidden) return;        // cancelled while we waited
+  //
+  // The upright step exists to get an iPad OUT of the landscape it was just
+  // being used in. A phone is already portrait — that is what its layout
+  // requires — so on mobile the step asks for the posture you are holding
+  // while you read it, which is a screen that exists only to be dismissed.
+  // Straight to the remote posture instead.
+  if (!isMobile()) {
+    showAirHow('upright');
+    await waitForPosture('portrait', (skip) => {
+      // Gravity never turned up. Say so and let them carry on by hand rather
+      // than staring at a screen that will never advance.
+      $('airhow-p').textContent =
+        'I cannot read this device\u2019s motion sensor, so I cannot tell how you '
+        + 'are holding it. Hold the phone upright, then continue.';
+      $('airhow-go').textContent = 'Continue';
+      $('airhow-go').hidden = false;
+      $('airhow-go').addEventListener('click', skip, { once: true });
+    });
+    if ($('airhow').hidden) return;      // cancelled while we waited
+  }
   showAirHow('start');
 }
 
