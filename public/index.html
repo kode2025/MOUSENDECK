@@ -114,6 +114,13 @@
            The pad calls preventDefault on every touch to stop iOS scrolling,
            which also cancels the synthesised click on anything inside it — so
            these bind their own touch handlers and stop propagation. -->
+      <!-- How many fingers the PAGE is actually receiving. Not decoration:
+           iPadOS claims three- and four-finger swipes for itself system-wide,
+           and when it does, the web page is simply never told about the third
+           touch. Without this you cannot tell "the gesture was not recognised"
+           from "the gesture never arrived", and those have completely
+           different fixes. -->
+      <div id="padfingers" aria-hidden="true"><span id="padfingers-n">0</span></div>
       <div id="padbtns">
         <button id="airbtn" class="pad-btn" aria-pressed="false"
                 aria-label="Air pointer (gyroscope)">✥</button>

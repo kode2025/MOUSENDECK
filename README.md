@@ -1817,6 +1817,24 @@ and is measured, not assumed.
 The phone layout is portrait. Stand it up. (The iPad layout is the opposite: it
 wants landscape.)
 
+**Three- or four-finger swipes do nothing**
+Put three fingers on the pad and watch the counter in its top-left corner. It
+shows how many touches the *page* is receiving, which is not always how many
+are on the glass.
+
+- **It says 3 and turns blue** — the gesture arrived. If nothing happens on the
+  Mac, check System Settings → Keyboard → **Keyboard Shortcuts…** →
+  **Mission Control**, and make sure **Move left a space** / **Move right a
+  space** are ticked. They are commonly off. You also need more than one
+  desktop for there to be anywhere to go.
+- **It stays on 1 or 2** — your device is keeping the extra touches. iPadOS
+  claims three- and four-finger swipes system-wide for Undo/Redo and the App
+  Switcher, and a web page is never told about them. Nothing in this project
+  can override that; `preventDefault()` and `touch-action: none` both sit
+  below the system gesture layer. Use the **Space ←** and **Space →** buttons
+  from the Windows category of the catalog instead — same shortcut, one tap,
+  and nothing can intercept it.
+
 **A button does nothing**
 It shouldn't be possible for a button to fail silently — the tile goes red and
 says why. "macOS is blocking…" means a permission, which has to be granted at

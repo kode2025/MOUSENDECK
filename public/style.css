@@ -234,6 +234,25 @@ body[data-lefty="1"] #stage { flex-direction:row-reverse; }
   color:var(--text-3); font-size:var(--hint-fs); text-align:center;
   pointer-events:none;
 }
+/* Sits opposite the pad buttons so a finger reaching for ✥ never covers it. */
+#padfingers {
+  position:absolute; top:10px; left:10px; z-index:2;
+  display:flex; align-items:center; gap:6px;
+  min-width:34px; height:26px; padding:0 9px;
+  border-radius:999px; background:var(--surface-3); border:1px solid var(--border);
+  color:var(--text-3); font-size:13px; font-variant-numeric:tabular-nums;
+  opacity:0; transition:opacity .18s ease;
+  pointer-events:none;                      /* never steals a touch */
+}
+#pad.touching #padfingers { opacity:1; }
+/* Three or more is the case people are trying to diagnose, so make it obvious
+   the moment it lands. */
+#pad.touching[data-fingers="3"] #padfingers,
+#pad.touching[data-fingers="4"] #padfingers,
+#pad.touching[data-fingers="5"] #padfingers {
+  background:var(--accent); border-color:var(--accent); color:#fff;
+}
+
 /* On the pad rather than in a toolbar: it is a property of the pad, and the
    pad is the one element present in both layouts. */
 #padbtns {

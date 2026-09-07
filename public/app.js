@@ -590,6 +590,25 @@ const ZOOM_REPEAT_MS = 55;
 const SWIPE_REPEAT_MS = 260;
 const REST_SLOP = 14;      // px a finger may drift and still count as resting
 
+/** Show how many fingers the PAGE is receiving, which is not always how many
+ *  are on the glass. iPadOS claims three- and four-finger swipes for itself,
+ *  and when it does the page is never told about the extra touches — so a
+ *  gesture that "does not work" may be one that never arrived. preventDefault
+ *  and touch-action sit below the system gesture layer and cannot stop it.
+ *  A readout is the only way to tell the two apart from the device. */
+let fingerHideTimer = null;
+function showFingers(n) {
+  const el = $('padfingers-n');
+  if (!el) return;
+  el.textContent = String(n);
+  pad.dataset.fingers = String(n);
+  pad.classList.add('touching');
+  clearTimeout(fingerHideTimer);
+  // Linger after the lift: the count you want to read is the one from the
+  // gesture you just made, and it is gone before you can look otherwise.
+  if (n === 0) fingerHideTimer = setTimeout(() => pad.classList.remove('touching'), 1100);
+}
+
 /** Multi-finger gestures, per platform, as the shortcut that reproduces them. */
 const GESTURES = {
   macos: {
@@ -681,6 +700,7 @@ pad.addEventListener('touchstart', (e) => {
   const c = centroid(e.touches);
   const now = performance.now();
   g.maxFingers = Math.max(g.maxFingers, n);
+  showFingers(n);
 
   // Per-finger origins: the difference between "both fingers moved" and "one
   // rested while the other slid" is the whole distinction between a scroll and
@@ -723,6 +743,7 @@ pad.addEventListener('touchmove', (e) => {
   if (!state.connected || !state.cfg) return;
 
   const n = e.touches.length;
+  showFingers(n);
   const c = centroid(e.touches);
   const now = performance.now();
   const dx = c.x - g.lastX, dy = c.y - g.lastY;
@@ -896,6 +917,7 @@ function endGesture(e) {
     }
   }
 
+  showFingers(e.touches.length);
   g.mode = 'idle';
   g.maxFingers = 0;
   g.armedDouble = false;
