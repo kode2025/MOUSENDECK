@@ -13,7 +13,8 @@
     "test:protocol": "node test/protocol.mjs",
     "test:actions": "node test/actions.mjs",
     "test:persistence": "node test/persistence.mjs",
-    "bench": "node test/latency.mjs"
+    "bench": "node test/latency.mjs",
+    "test:spaces": "node test/spaces.mjs"
   },
   "engines": {
     "node": ">=18"

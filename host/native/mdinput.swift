@@ -140,18 +140,31 @@ let keyCodes: [String: CGKeyCode] = [
     "left":123,"right":124,"down":125,"up":126,
 ]
 
+func flagFor(_ mod: String) -> CGEventFlags {
+    switch mod.lowercased() {
+    case "cmd", "command", "meta": return .maskCommand
+    case "shift":                  return .maskShift
+    case "alt", "option", "opt":   return .maskAlternate
+    case "ctrl", "control":        return .maskControl
+    case "fn", "function":         return .maskSecondaryFn
+    default:                       return []
+    }
+}
+
+/// The virtual key code of each modifier, so it can be pressed for real
+/// rather than merely asserted as a flag. Left-hand variants, which is what
+/// a keyboard sends unless you deliberately use the right-hand key.
+let modKeyCodes: [String: CGKeyCode] = [
+    "cmd": 55, "command": 55, "meta": 55,
+    "shift": 56,
+    "alt": 58, "option": 58, "opt": 58,
+    "ctrl": 59, "control": 59,
+    "fn": 63, "function": 63,
+]
+
 func flags(from mods: [String]) -> CGEventFlags {
     var f = CGEventFlags()
-    for m in mods {
-        switch m.lowercased() {
-        case "cmd", "command", "meta": f.insert(.maskCommand)
-        case "shift":                  f.insert(.maskShift)
-        case "alt", "option", "opt":   f.insert(.maskAlternate)
-        case "ctrl", "control":        f.insert(.maskControl)
-        case "fn", "function":         f.insert(.maskSecondaryFn)
-        default: break
-        }
-    }
+    for m in mods { f.insert(flagFor(m)) }
     return f
 }
 
@@ -177,13 +190,50 @@ func pressKey(_ key: String, mods: [String]) {
     }
     var f = flags(from: mods)
     if arrowKeyCodes.contains(code) { f.insert(.maskNumericPad) }
+
+    // Build the events BEFORE touching any modifier, so a failure here can
+    // never leave Control stuck down on someone's Mac.
     guard let down = CGEvent(keyboardEventSource: src, virtualKey: code, keyDown: true),
           let up   = CGEvent(keyboardEventSource: src, virtualKey: code, keyDown: false)
     else { return }
+
+    // Press the modifiers for real, rather than only asserting them as flags.
+    //
+    // Setting .flags is enough for an ordinary application shortcut: the app
+    // reads the flags off the event and acts. It is NOT enough for the
+    // system hotkeys owned by the WindowServer — switching Spaces, Mission
+    // Control — which track the actual modifier key state coming off the HID
+    // stream. A ⌃← carrying the control FLAG but with no control key ever
+    // held looks like nothing was pressed, and is ignored in silence.
+    //
+    // So do what hardware does: hold the modifier, tap the key, release it.
+    let modCodes = mods.compactMap { modKeyCodes[$0.lowercased()] }
+    var running = CGEventFlags()
+    for m in mods {
+        guard let mc = modKeyCodes[m.lowercased()] else { continue }
+        running.insert(flagFor(m))
+        if let md = CGEvent(keyboardEventSource: src, virtualKey: mc, keyDown: true) {
+            md.flags = running
+            md.post(tap: .cghidEventTap)
+        }
+    }
+
     down.flags = f
     up.flags = f
     down.post(tap: .cghidEventTap)
     up.post(tap: .cghidEventTap)
+
+    // Release in reverse, unwinding the flag set the same way it was built.
+    // Unconditional: whatever happened above, the keyboard ends up idle.
+    for m in mods.reversed() {
+        guard let mc = modKeyCodes[m.lowercased()] else { continue }
+        running.remove(flagFor(m))
+        if let mu = CGEvent(keyboardEventSource: src, virtualKey: mc, keyDown: false) {
+            mu.flags = running
+            mu.post(tap: .cghidEventTap)
+        }
+    }
+    _ = modCodes
 }
 
 /// Type arbitrary text, including characters with no dedicated key code.
