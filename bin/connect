@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# connect — start the trackpad + deck server and print a QR code.
+#
+# Runs in the foreground on purpose: Ctrl-C stops it and nothing is left
+# behind. There is no background agent and nothing starts at login.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+command -v node >/dev/null 2>&1 || {
+  echo "connect: node is not installed — get it from https://nodejs.org"
+  exit 1
+}
+
+[ -d node_modules ] || { echo "  first run — installing dependencies…"; npm install --silent; }
+[ -x host/native/mdinput ] || { echo "  building the input helper…"; bash host/native/build.sh; }
+
+# If an older run is still holding the port, clear it rather than failing with
+# an opaque EADDRINUSE. Honour $PORT: this used to check 8787 no matter what
+# you asked for, so starting a second instance on another port would kill the
+# first one — and then bind fine, leaving you convinced the port had been busy.
+PORT="${PORT:-8787}"
+if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "  port $PORT was busy — stopping the previous run"
+  # Only the process actually holding this port, not every server.js on the box.
+  lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | xargs -r kill 2>/dev/null || true
+  sleep 1
+fi
+export PORT
+
+# HTTPS is the default, because iOS only gives the gyroscope to a secure page
+# and the air pointer is not worth hiding behind a flag you have to remember.
+# `connect --plain` serves plain http instead — no certificate warning, no
+# pointer. See host/certs.js for why the warning exists at all.
+exec node host/server.js "$@"

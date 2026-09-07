@@ -1,0 +1,291 @@
+{
+  "columns": 5,
+  "pages": [
+    {
+      "name": "Main",
+      "buttons": [
+        {
+          "id": "88dcd1455a5f",
+          "label": "Copy",
+          "icon": "⧉",
+          "color": "#3b82f6",
+          "action": {
+            "type": "key",
+            "key": "c",
+            "mods": [
+              "cmd"
+            ]
+          },
+          "builtin": "edit.copy"
+        },
+        {
+          "id": "3ce1c923c538",
+          "label": "Paste",
+          "icon": "⇩",
+          "color": "#3b82f6",
+          "action": {
+            "type": "key",
+            "key": "v",
+            "mods": [
+              "cmd"
+            ]
+          },
+          "builtin": "edit.paste"
+        },
+        {
+          "id": "39545660bc13",
+          "label": "Undo",
+          "icon": "⤺",
+          "color": "#6366f1",
+          "action": {
+            "type": "key",
+            "key": "z",
+            "mods": [
+              "cmd"
+            ]
+          },
+          "builtin": "edit.undo"
+        },
+        {
+          "id": "a650e8e8e672",
+          "label": "Redo",
+          "icon": "⤻",
+          "color": "#6366f1",
+          "action": {
+            "type": "key",
+            "key": "z",
+            "mods": [
+              "cmd",
+              "shift"
+            ]
+          },
+          "builtin": "edit.redo"
+        },
+        {
+          "id": "c9d676cbf273",
+          "label": "Prev",
+          "icon": "⏮",
+          "color": "#8b5cf6",
+          "action": {
+            "type": "media",
+            "k": "prev"
+          },
+          "builtin": "media.prev"
+        },
+        {
+          "id": "bed9a0c89a3a",
+          "label": "Play",
+          "icon": "⏯",
+          "color": "#8b5cf6",
+          "action": {
+            "type": "media",
+            "k": "playpause"
+          },
+          "builtin": "media.playpause"
+        },
+        {
+          "id": "19652186b12d",
+          "label": "Next",
+          "icon": "⏭",
+          "color": "#8b5cf6",
+          "action": {
+            "type": "media",
+            "k": "next"
+          },
+          "builtin": "media.next"
+        },
+        {
+          "id": "2f2d7850a2f0",
+          "label": "Mute",
+          "icon": "🔇",
+          "color": "#8b5cf6",
+          "action": {
+            "type": "media",
+            "k": "mute"
+          },
+          "builtin": "media.mute"
+        },
+        {
+          "id": "5c65b097ea3d",
+          "label": "Vol −",
+          "icon": "🔉",
+          "color": "#0ea5e9",
+          "action": {
+            "type": "media",
+            "k": "sounddown"
+          },
+          "builtin": "media.voldown"
+        },
+        {
+          "id": "a12b470728d0",
+          "label": "Vol +",
+          "icon": "🔊",
+          "color": "#0ea5e9",
+          "action": {
+            "type": "media",
+            "k": "soundup"
+          },
+          "builtin": "media.volup"
+        },
+        {
+          "id": "0f58f079eecc",
+          "label": "Mission",
+          "icon": "▦",
+          "color": "#14b8a6",
+          "action": {
+            "type": "key",
+            "key": "up",
+            "mods": [
+              "ctrl"
+            ]
+          },
+          "builtin": "window.mission"
+        },
+        {
+          "id": "1bb12a9a70f6",
+          "label": "Spotlight",
+          "icon": "🔍",
+          "color": "#14b8a6",
+          "action": {
+            "type": "key",
+            "key": "space",
+            "mods": [
+              "cmd"
+            ]
+          },
+          "builtin": "system.spotlight"
+        },
+        {
+          "id": "c22df536387a",
+          "label": "Snip",
+          "icon": "📸",
+          "color": "#f59e0b",
+          "action": {
+            "type": "key",
+            "key": "4",
+            "mods": [
+              "cmd",
+              "shift"
+            ]
+          },
+          "builtin": "shot.area"
+        },
+        {
+          "id": "4d9bf6b923c3",
+          "label": "Full Shot",
+          "icon": "🖼",
+          "color": "#f59e0b",
+          "action": {
+            "type": "key",
+            "key": "3",
+            "mods": [
+              "cmd",
+              "shift"
+            ]
+          },
+          "builtin": "shot.full"
+        },
+        {
+          "id": "dc46536105a9",
+          "label": "Rec Screen",
+          "icon": "⏺",
+          "color": "#ef4444",
+          "action": {
+            "type": "shell",
+            "cmd": "screencapture -v \"$HOME/Desktop/Recording-$(date +%Y-%m-%d-%H%M%S).mov\"",
+            "as": "full screen"
+          },
+          "builtin": "rec.screen"
+        },
+        {
+          "id": "974f11b9e133",
+          "label": "Rec Area",
+          "icon": "⏹",
+          "color": "#ef4444",
+          "action": {
+            "type": "shell",
+            "cmd": "screencapture -J video \"$HOME/Desktop/Recording-$(date +%Y-%m-%d-%H%M%S).mov\"",
+            "as": "pick an area"
+          },
+          "builtin": "rec.area"
+        },
+        {
+          "id": "629f718bdd04",
+          "label": "Stop Rec",
+          "icon": "⏏",
+          "color": "#ef4444",
+          "action": {
+            "type": "shell",
+            "cmd": "pkill -INT screencapture || { echo \"No recording is running.\" >&2; exit 1; }",
+            "as": "ends recording"
+          },
+          "builtin": "rec.stop"
+        },
+        {
+          "id": "1f5510d1d79a",
+          "label": "Lock",
+          "icon": "🔒",
+          "color": "#ef4444",
+          "action": {
+            "type": "key",
+            "key": "q",
+            "mods": [
+              "cmd",
+              "ctrl"
+            ]
+          },
+          "builtin": "system.lock"
+        },
+        {
+          "id": "70851a7b7955",
+          "label": "Finder",
+          "icon": "📁",
+          "color": "#22c55e",
+          "action": {
+            "type": "open",
+            "target": "~"
+          },
+          "builtin": "app.finder"
+        },
+        {
+          "id": "5a507f6bcc26",
+          "label": "Browser",
+          "icon": "🌐",
+          "color": "#22c55e",
+          "action": {
+            "type": "open",
+            "target": "Safari"
+          },
+          "builtin": "app.safari"
+        },
+        {
+          "id": "8e928b706719",
+          "label": "Do Not Disturb",
+          "icon": "🌙",
+          "color": "#6366F1",
+          "action": {
+            "type": "shell",
+            "cmd": "shortcuts run \"Toggle DND\" 2>/dev/null || { echo \"Do Not Disturb needs a one-time setup on the Mac. Open the Shortcuts app, create a shortcut named exactly \\\"Toggle DND\\\", give it the Set Focus action set to Do Not Disturb / Toggle, and save. This button will work from then on. Apple removed every other way to switch Focus from a script in macOS 12.\" >&2; exit 1; }",
+            "as": "via Shortcuts"
+          },
+          "builtin": "system.dnd"
+        }
+      ]
+    }
+  ],
+  "customs": [
+    {
+      "id": "6c71d548b1d0",
+      "label": "New",
+      "icon": "⭐",
+      "color": "#4C8DFF",
+      "action": {
+        "type": "key",
+        "key": "",
+        "mods": [
+          "cmd"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# disconnect — stop the server and every helper it started.
+#
+# `connect` runs in the foreground, so Ctrl-C is usually enough. This is for
+# the times it was backgrounded, or a terminal was closed on top of it, and
+# something is still holding port 8787.
+set -uo pipefail
+
+# Same port the server would have used, so `PORT=9000 disconnect` checks 9000.
+PORT="${PORT:-8787}"
+
+found=0
+
+stop() {
+  local pattern="$1" label="$2"
+  local pids
+  pids=$(pgrep -f "$pattern" 2>/dev/null)
+  if [ -n "$pids" ]; then
+    found=1
+    echo "  stopping $label ($(echo "$pids" | tr '\n' ' ' | sed 's/ $//'))"
+    kill $pids 2>/dev/null
+  fi
+}
+
+echo
+echo "  MouseNDeck — shutting down"
+echo "  ──────────────────────────"
+
+stop "host/server.js"        "server"
+stop "host/native/mdinput"   "input helper"
+stop "dns-sd -R .*_mousendeck" "Bonjour advertisement"
+stop "dns-sd -B _mousendeck"   "Bonjour browser"
+
+sleep 1
+
+# Anything that ignored SIGTERM gets a harder nudge.
+for p in "host/server.js" "host/native/mdinput"; do
+  pids=$(pgrep -f "$p" 2>/dev/null)
+  [ -n "$pids" ] && kill -9 $pids 2>/dev/null
+done
+
+echo
+if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "  ⚠ something is still listening on port $PORT:"
+  lsof -nP -iTCP:"$PORT" -sTCP:LISTEN | tail -n +2 | awk '{print "     ", $1, "pid", $2}'
+  exit 1
+fi
+
+if [ "$found" = "0" ]; then
+  echo "  Nothing was running — already clean."
+else
+  echo "  ✓ Stopped. Port $PORT is free and nothing is left running."
+fi
+echo

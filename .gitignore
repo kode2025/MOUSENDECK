@@ -1,0 +1,19 @@
+node_modules/
+.DS_Store
+*.log
+
+# Holds the LAN auth token and this Mac's identity — never commit it.
+config.json
+config.json.tmp
+
+# Your buttons live in board.json, which IS safe to commit. Only the
+# half-written temporary file is not.
+board.json.tmp
+
+# Self-signed TLS material, regenerated automatically per machine.
+certs/
+
+# Compiled Swift helper; rebuild with `npm run build`.
+host/native/mdinput
+host/native/*.dSYM/
+

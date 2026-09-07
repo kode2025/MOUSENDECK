@@ -1,0 +1,25 @@
+{
+  "name": "mousendeck",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Turn an iPhone or iPad into a trackpad and programmable macro deck for your Mac.",
+  "type": "module",
+  "main": "host/server.js",
+  "scripts": {
+    "start": "node host/server.js",
+    "build": "bash host/native/build.sh",
+    "setup": "bash host/native/build.sh && node host/server.js",
+    "test": "node test/console.mjs && node test/persistence.mjs",
+    "test:protocol": "node test/protocol.mjs",
+    "test:actions": "node test/actions.mjs",
+    "test:persistence": "node test/persistence.mjs",
+    "bench": "node test/latency.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0",
+    "ws": "^8.18.0"
+  }
+}

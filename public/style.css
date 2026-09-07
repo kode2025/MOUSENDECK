@@ -1,0 +1,934 @@
+/* style.css — every pixel of the client, in one stylesheet.
+ *
+ * Served straight to the device with no build step, so there is no
+ * preprocessor here: custom properties do the work a variable file would.
+ *
+ * Layout is driven by two attributes on <body>, both set from measurement
+ * rather than from a control the user has to find:
+ *   data-layout="ipad"   landscape, board and trackpad side by side
+ *   data-layout="mobile" portrait, one pane at a time
+ * plus data-platform (macos | windows), data-lefty and data-air.
+ *
+ * Two things are easy to get wrong here and are commented where they happen:
+ *   · Grid tracks use minmax(0,1fr), never 1fr. A bare 1fr means
+ *     minmax(auto,1fr), which lets content stretch the track and pushes the
+ *     whole stage wider than the screen.
+ *   · The narrow-screen overrides live at the END of the file. They share
+ *     specificity with the rules they override, so source order is what
+ *     decides — moving them earlier silently stops them applying.
+ *
+ * Sections: design tokens · header · pane rail · board · trackpad ·
+ * air pointer · keyboards · sheets · rotate gate · layouts · motion.
+ */
+
+/* ═══ Design tokens ══════════════════════════════════════════════════
+   Dark-first: this is a control surface, usually used beside a Mac in a
+   dim room. Ratios are against --bg; body text clears WCAG 2.2 AA 4.5:1
+   and UI chrome clears 3:1.
+   On iPad 9 the DPR is exactly 2, so 1 CSS px === 1 iOS point and every
+   Apple HIG "pt" figure is usable verbatim.                            */
+:root {
+  --bg:#0B0C0F; --surface:#14161B; --surface-2:#1C1F26; --surface-3:#242832;
+  --border:#2A2F3A; --border-hi:#3A4150;
+  --text:#F2F4F8;   /* 17.4:1 */
+  --text-2:#A8AEBB; /*  8.4:1 */
+  --text-3:#7C8494; /*  4.9:1 */
+  --accent:#4C8DFF; --success:#34D07A; --warning:#F5A524; --danger:#FF5C5C;
+
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px;
+  --r-sm:10px; --r-md:14px; --r-lg:20px; --r-pill:999px;
+  --dur-fast:120ms; --dur:200ms; --ease:cubic-bezier(.2,.7,.3,1);
+  --tap:44px;                 /* HIG / WCAG 2.2 minimum target */
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
+
+  /* Interface scale, 5% at a time from Settings. Deliberately scoped to the
+     working area — the header is chrome you read, not content you zoom, and
+     shrinking the latency readout to 8px helps nobody. */
+  --ui:1;
+  --gap:       calc(12px * var(--ui));
+  --tile-min:  calc(84px * var(--ui));   /* the floor a tile may shrink to */
+  --tile-ico:  calc(26px * var(--ui));
+  --tile-lbl:  calc(13px * var(--ui));
+  --tile-combo:calc(10px * var(--ui));
+  --key-min:   calc(46px * var(--ui));
+  --key-fs:    calc(13px * var(--ui));
+  --key-gap:   calc(6px  * var(--ui));
+  --hint-fs:   calc(14px * var(--ui));
+  --strip-h:   calc(64px * var(--ui));
+
+  /* Home-button iPad reports 0 for every inset; the opaque status bar
+     already reserves its band, so these only matter on other hardware. */
+  --pad-top: env(safe-area-inset-top);
+  --pad-bottom: env(safe-area-inset-bottom);
+  --wc-zone: 132px;           /* iPadOS 26 window-controls safe zone */
+}
+/* Windows mode gets its own accent so you can tell which vocabulary the
+   board is speaking without reading the button. The header itself stays
+   identical in both styles — the button already says which one you are in. */
+body[data-platform="windows"] { --accent:#0A84FF; }
+
+@media (prefers-color-scheme: light) {
+  :root { --bg:#F5F6F8; --surface:#fff; --surface-2:#EDEFF3; --surface-3:#E2E5EB;
+    --border:#D4D8E0; --border-hi:#B9BFCB;
+    --text:#12141A; --text-2:#4A5160; --text-3:#6B7280; --accent:#0A64E8; }
+}
+@media (prefers-contrast: more) {
+  :root { --border:#5A6272; --text-2:#D2D7E0; --text-3:#AEB6C4; }
+}
+
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body {
+  margin:0; height:100%; background:var(--bg); color:var(--text);
+  font-family:var(--font); font-size:15px; line-height:1.4;
+  overscroll-behavior:none; -webkit-user-select:none; user-select:none;
+  -webkit-text-size-adjust:100%;
+}
+body { display:flex; flex-direction:column; height:100dvh; }
+button,input,select,textarea { font:inherit; color:inherit; }
+[hidden] { display:none !important; }
+:focus-visible { outline:3px solid var(--accent); outline-offset:2px; border-radius:var(--r-sm); }
+.muted { color:var(--text-3); }
+.spacer { flex:1; }
+
+/* ═══ Header — 56px ═════════════════════════════════════════════════ */
+#bar {
+  flex:none; height:56px; display:flex; align-items:center; gap:var(--sp-2);
+  padding:0 var(--sp-4); padding-top:var(--pad-top);
+  border-bottom:1px solid var(--border); background:var(--surface);
+}
+#brand {
+  width:var(--wc-zone); flex:none; pointer-events:none;
+  font-weight:650; font-size:15px; letter-spacing:-.01em; color:var(--text-2);
+  /* Must not wrap to two lines when "· Windows" is appended. */
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.chip {
+  display:flex; align-items:center; gap:var(--sp-2);
+  height:36px; padding:0 var(--sp-3); max-width:260px;
+  background:var(--surface-2); border:1px solid var(--border); border-radius:var(--r-pill);
+}
+.chip-name { font-weight:600; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dot { width:9px; height:9px; border-radius:50%; background:var(--text-3); flex:none; }
+.dot.ok{background:var(--success)} .dot.bad{background:var(--danger)}
+
+/* Tabular numerals are non-negotiable: proportional digits make the timer
+   twitch every second, pulling the eye off the trackpad. */
+.timer {
+  font-variant-numeric:tabular-nums; font-size:16px; font-weight:600;
+  color:var(--text-2); min-width:64px;
+}
+/* The reminder is the least important thing in the bar, so it is the only
+   thing allowed to shrink. Everything else keeps its size. */
+.cleanup {
+  font-size:12px; color:var(--text-3); white-space:nowrap;
+  margin-right:var(--sp-3);
+  flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis;
+}
+.cleanup code {
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:11px; color:var(--text-2);
+  background:var(--surface-2); border:1px solid var(--border);
+  border-radius:6px; padding:2px 6px;
+}
+/* One header, everywhere — same height, same order, same wording in both
+   shortcut styles and both layouts. A narrow screen does not get a different
+   header, it gets the same one with the least important parts trimmed, in
+   order: the prose around the command, then the command, then the leading
+   window-controls gap, then the wordmark. Driven by width rather than by
+   layout, because it is the width that runs out. */
+@media (max-width:1000px) { .cleanup { font-size:0; }
+  .cleanup code { font-size:11px; } }
+@media (max-width:860px) { .cleanup { display:none; } }
+/* Below this it is certainly not an iPad window, so the 132px reserved for
+   iPadOS window controls is dead space. */
+@media (max-width:820px) { #brand { width:auto; max-width:132px; } }
+@media (max-width:700px) { #brand { display:none; } }
+
+
+/* Never squeezed out: the latency reading is the one number worth watching. */
+.latency {
+  font-variant-numeric:tabular-nums; font-size:13px; color:var(--text-3);
+  min-width:5ch; text-align:right; flex:none; white-space:nowrap;
+}
+.latency.good{color:var(--success)} .latency.okish{color:var(--warning)} .latency.poor{color:var(--danger)}
+
+.icon-btn {
+  min-width:var(--tap); height:var(--tap); padding:0 var(--sp-3);
+  background:transparent; border:1px solid transparent; border-radius:var(--r-sm);
+  color:var(--text-2); cursor:pointer;
+}
+.icon-btn.small { min-width:36px; height:36px; padding:0 var(--sp-2); }
+.icon-btn.danger-btn:active { background:color-mix(in srgb,var(--danger) 25%,transparent); }
+.icon-btn:disabled { opacity:.3; cursor:default; }
+
+/* Header text buttons (Edit / Done / Save changes / Discard changes) */
+.head-btn {
+  height:36px; padding:0 var(--sp-3); white-space:nowrap;
+  background:transparent; border:1px solid var(--border);
+  border-radius:var(--r-sm); color:var(--text-2);
+  font-size:14px; font-weight:600; cursor:pointer;
+}
+.head-btn:active { background:var(--surface-2); }
+.head-btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+
+/* Discard slides in between the delete button and Save, pushing delete left.
+   Animating max-width rather than toggling display keeps the movement smooth
+   instead of the row snapping to a new layout. */
+.discard {
+  max-width:0; opacity:0; padding:0; margin-left:0;
+  overflow:hidden; border-color:transparent;
+  color:var(--danger);
+  transition:max-width var(--dur) var(--ease), opacity var(--dur) var(--ease),
+             padding var(--dur) var(--ease), margin-left var(--dur) var(--ease),
+             border-color var(--dur) var(--ease);
+}
+.discard.show {
+  max-width:180px; opacity:1; padding:0 var(--sp-3); margin-left:var(--sp-2);
+  border-color:color-mix(in srgb,var(--danger) 45%,var(--border));
+}
+.discard:active { background:color-mix(in srgb,var(--danger) 20%,transparent); }
+.icon-btn:active { background:var(--surface-2); }
+.icon-btn[aria-pressed="true"] { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+
+/* ═══ Stage ═════════════════════════════════════════════════════════
+   Landscape 1080x790 working canvas:
+     16 margin | 472 deck | 20 gutter | 556 trackpad | 16 margin        */
+#stage {
+  flex:1; min-height:0; position:relative;
+  display:flex; gap:20px;
+  padding:var(--sp-3) var(--sp-4) max(var(--sp-4),var(--pad-bottom));
+}
+#boardcol { flex:472 1 0; min-width:0; display:flex; flex-direction:column; gap:var(--sp-3); }
+#padcol   { flex:556 1 0; min-width:0; display:flex; flex-direction:column; gap:var(--sp-3); }
+body[data-lefty="1"] #stage { flex-direction:row-reverse; }
+
+
+/* Disconnected: dim but keep visible. Hiding the panes would destroy the
+   spatial memory of where every button lives. */
+#stage[data-connected="0"] #boardcol,
+#stage[data-connected="0"] #padcol { opacity:.38; pointer-events:none; }
+.notconnected {
+  position:absolute; inset:0; margin:auto; height:1.4em;
+  text-align:center; color:var(--text-2); font-size:17px; font-weight:600;
+  pointer-events:none;
+}
+#stage[data-connected="1"] .notconnected { display:none; }
+
+/* ═══ Trackpad ══════════════════════════════════════════════════════ */
+/* No pixel minimum: the flex ratio against the deck already guarantees the
+   pad more than half the width, and a hard floor was the one thing that could
+   push the stage wider than the screen. */
+#pad {
+  flex:1; min-width:0; min-height:0;
+  position:relative; touch-action:none; overflow:hidden;
+  background:linear-gradient(160deg,var(--surface-2),var(--surface));
+  border:1px solid var(--border); border-radius:var(--r-lg);
+}
+#pad.live { border-color:var(--accent); }
+/* A permanent legend, not a first-run tip — see the touchstart handler.
+   pointer-events:none so it can never swallow a touch meant for the pad. */
+#padhint {
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:6px; padding:var(--sp-4);
+  color:var(--text-3); font-size:var(--hint-fs); text-align:center;
+  pointer-events:none;
+}
+/* On the pad rather than in a toolbar: it is a property of the pad, and the
+   pad is the one element present in both layouts. */
+#padbtns {
+  position:absolute; top:10px; right:10px; z-index:2;
+  display:flex; flex-direction:column; gap:8px;
+}
+.pad-btn {
+  min-width:46px; height:46px; padding:0;
+  display:grid; place-items:center;
+  background:var(--surface-3); border:1px solid var(--border);
+  border-radius:var(--r-sm); color:var(--text-3);
+  font-size:17px; line-height:1; cursor:pointer;
+}
+.pad-btn:active { background:var(--border); }
+.pad-btn[aria-pressed="true"] {
+  background:var(--accent); border-color:var(--accent); color:#fff;
+}
+/* Aiming the phone is the gesture now, so say so with the border. */
+body[data-air="1"] #pad { border-color:var(--accent); }
+/* ── Pointer mode is a screen of its own ────────────────────────────────
+   Everything else goes away. You are holding the phone flat and looking at
+   the Mac; a header, a deck and a trackpad you cannot see are just surface
+   area for accidental taps. */
+/* The launch chooser sits under the in-use lock (someone else driving the Mac
+   is a more urgent thing to say) but over everything else. */
+#launch { z-index:205; }
+#launch .rotate-inner { max-width:460px; }
+.launch-opts { display:flex; flex-direction:column; gap:var(--sp-3); margin-top:var(--sp-4); }
+.launch-opt {
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  padding:var(--sp-4); cursor:pointer;
+  background:var(--surface-2); border:2px solid var(--border);
+  border-radius:var(--r-lg); color:var(--text);
+}
+.launch-opt:active { background:var(--surface-3); }
+#launch-pointer { border-color:color-mix(in srgb,var(--accent) 55%,var(--border)); }
+.lo-ico  { font-size:30px; line-height:1; color:var(--accent); }
+.lo-name { font-size:17px; font-weight:700; }
+.lo-sub  { font-size:12px; color:var(--text-3); line-height:1.45; }
+
+/* Choosing is the whole job while this is up, and "pointer" means staying
+   flat — so do not also demand landscape underneath it. */
+body[data-launch="1"] .rotate:not(.busy) { display:none !important; }
+
+#airui { display:none; }
+body[data-air="1"] #bar,
+body[data-air="1"] #panebar,
+body[data-air="1"] #stage { display:none !important; }
+body[data-air="1"] #airui {
+  display:flex; flex-direction:column; align-items:stretch;
+  position:fixed; inset:0; z-index:150;
+  padding:max(var(--sp-4),var(--pad-top)) var(--sp-4) max(var(--sp-4),var(--pad-bottom));
+  gap:var(--sp-3); background:var(--bg);
+}
+/* The pointer screen sits at z-index 150, so its own settings sheet has to
+   clear it — the default sheet layer is below and would open invisibly. */
+#airset { z-index:220; }
+
+#airui-head { display:flex; align-items:center; gap:var(--sp-3); }
+#airui-head > div { flex:1; min-width:0; }
+#airui-head .pad-btn { flex:none; }
+#airui-title {
+  margin:0; text-align:center; font-size:13px; font-weight:800;
+  letter-spacing:.18em; color:var(--accent);
+}
+#airui-sub { margin:0; text-align:center; font-size:12px; color:var(--text-3); }
+/* Side by side, filling everything under the exit button: two targets you can
+   hit by feel while looking at the Mac rather than at the phone. */
+#airui-clicks { flex:1; min-height:0; display:flex; flex-direction:row; gap:var(--sp-3); }
+.air-big {
+  flex:1 1 0; min-width:0; min-height:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+  background:var(--surface-2); border:2px solid var(--border);
+  border-radius:var(--r-lg); color:var(--text); cursor:pointer;
+  touch-action:manipulation; -webkit-user-select:none; user-select:none;
+}
+.air-big .air-ico { font-size:44px; line-height:1; color:var(--accent); }
+.air-big .air-lbl { font-size:15px; font-weight:700; letter-spacing:.02em; }
+.air-big[aria-pressed="true"] {
+  background:var(--accent); border-color:var(--accent); color:#fff;
+}
+.air-big[aria-pressed="true"] .air-ico { color:#fff; }
+/* The wheel, in the place a mouse keeps it. Narrow on purpose: the two click
+   targets matter more, and a thumb only needs a lane to travel down. */
+#air-scroll {
+  flex:0 0 82px; min-width:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+  background:var(--surface); border:2px dashed var(--border);
+  border-radius:var(--r-lg); color:var(--text-3);
+  touch-action:none; -webkit-user-select:none; user-select:none;
+}
+#air-scroll.live { border-color:var(--accent); border-style:solid; color:var(--accent); }
+.air-sc-ico { font-size:28px; line-height:1; }
+.air-sc-lbl { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+
+#air-exit {
+  flex:none; min-height:56px;
+  background:transparent; border:1px solid var(--border-hi);
+  border-radius:var(--r-lg); color:var(--text-2);
+  font-size:15px; font-weight:600; cursor:pointer;
+}
+#air-exit:active { background:var(--surface-2); }
+
+#modstrip { flex:none; display:flex; gap:6px; height:var(--strip-h); }
+.sticky {
+  flex:1; background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--r-md); color:var(--text-2); font-size:18px;
+  font-weight:600; cursor:pointer;
+}
+.sticky.wide { flex:2.2; font-size:15px; }
+.sticky[aria-pressed="true"] { background:var(--accent); border-color:var(--accent); color:#fff; }
+#kbinput {
+  position:absolute; opacity:0; pointer-events:none; height:1px; width:1px;
+}
+
+/* ═══ Board ═════════════════════════════════════════════════════════ */
+#boardhead { flex:none; height:40px; display:flex; align-items:center; gap:var(--sp-2); position:relative; }
+#boardswitch {
+  display:flex; align-items:center; gap:6px; height:36px; padding:0 var(--sp-3);
+  background:transparent; border:1px solid transparent; border-radius:var(--r-sm);
+  color:var(--text); cursor:pointer;
+}
+#boardswitch:active, #boardswitch[aria-expanded="true"] { background:var(--surface-2); border-color:var(--border); }
+#boardname { font-weight:650; font-size:16px; }
+.caret { color:var(--text-3); font-size:12px; }
+
+#boardmenu {
+  position:absolute; top:44px; left:0; z-index:70; min-width:220px;
+  background:var(--surface); border:1px solid var(--border-hi);
+  border-radius:var(--r-md); padding:6px;
+  box-shadow:0 16px 40px rgba(0,0,0,.5);
+  display:flex; flex-direction:column; gap:2px;
+}
+.menuitem {
+  min-height:var(--tap); padding:0 var(--sp-3); text-align:left;
+  background:transparent; border:none; border-radius:var(--r-sm);
+  color:var(--text); font-size:15px; cursor:pointer;
+}
+.menuitem:active { background:var(--surface-2); }
+.menuitem.on { background:var(--surface-3); font-weight:650; }
+.menuitem.sub { color:var(--text-2); font-size:14px; border-top:1px solid var(--border); margin-top:4px; padding-top:4px; }
+
+/* Fit-to-screen, in one rule.
+   The row count is exact (set by JS from the tile count), and every row is
+   minmax(floor, 1fr): while the board fits, 1fr wins and the rows stretch to
+   fill the column with no scrollbar; once you zoom in past the point where it
+   fits, the floor wins and it scrolls instead of crushing the tiles.
+   minmax(0,1fr) on the columns matters too — a bare 1fr is minmax(auto,1fr),
+   which let a long shortcut caption widen its own column and left the grid
+   visibly uneven. */
+#grid {
+  flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+  display:grid; gap:var(--gap);
+  grid-template-columns:repeat(var(--cols,4),minmax(0,1fr));
+  grid-template-rows:repeat(var(--rows,1),minmax(var(--tile-min),1fr));
+  grid-auto-rows:minmax(var(--tile-min),1fr);
+  align-content:stretch;
+}
+/* Padding and inner gap scale with the rest. If any one contributor stayed at
+   a fixed px it would dominate at 60% and push the caption out of the tile —
+   with everything on the same multiplier the fit holds at every size. */
+.tile {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:calc(5px * var(--ui)); min-height:0; height:100%;
+  padding:calc(8px * var(--ui));
+  background:color-mix(in srgb,var(--c,var(--accent)) 16%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--c,var(--accent)) 38%,var(--border));
+  border-radius:var(--r-md); color:var(--text); cursor:pointer;
+  touch-action:manipulation;
+  transition:transform var(--dur-fast) var(--ease), filter var(--dur-fast) var(--ease);
+}
+.tile .ico { font-size:var(--tile-ico); line-height:1; flex:none; }
+.tile .lbl { font-size:var(--tile-lbl); line-height:1.2; font-weight:600;
+  color:var(--text-2); text-align:center; flex:none;
+  max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tile .combo { font-size:var(--tile-combo); line-height:1.2; color:var(--text-3);
+  font-variant-numeric:tabular-nums; flex:none;
+  max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* Short rows cannot hold three lines. The shortcut goes first — you already
+   know what ⌘C does — and the label only at the point where it would clip. */
+#grid.tight .tile .combo { display:none; }
+#grid.tiny  .tile .lbl   { display:none; }
+#grid.tiny  .tile        { gap:0; }
+/* iOS Safari has no Vibration API, so a press must read purely by sight. */
+.tile.down { transform:scale(.94); filter:brightness(1.5); }
+.tile.fired { animation:pulse 380ms var(--ease); }
+@keyframes pulse {
+  0%   { box-shadow:0 0 0 0 color-mix(in srgb,var(--c,var(--accent)) 70%,transparent); }
+  100% { box-shadow:0 0 0 14px transparent; }
+}
+/* Top-left star: "you made this one". Small and dim — it labels the tile
+   without competing with the icon for attention. Top-left is the one free
+   corner: the delete badge sits top-right and the built-in lock bottom-right.
+
+   Inset far enough to clear the 14px corner radius. At 4px/3px the glyph sat
+   outside the curve and read as escaping the tile rather than belonging to it.
+   The floor also keeps it legible — purely proportional, a 10px star lands at
+   5px once the interface scales to 50%, which is a speck, not a marker. The
+   radius is the same in both layouts, so one rule covers iPad and mobile. */
+.tile .mine {
+  position:absolute;
+  top:max(6px, calc(7px * var(--ui))); left:max(7px, calc(8px * var(--ui)));
+  font-size:max(9px, calc(10px * var(--ui))); line-height:1;
+  color:var(--warning); opacity:.85; pointer-events:none;
+}
+
+/* Failure has to be as visible as success, and different from it. */
+.tile.failed {
+  animation:shake 380ms var(--ease);
+  background:color-mix(in srgb,var(--danger) 30%,var(--surface));
+  border-color:var(--danger);
+}
+@keyframes shake {
+  0%,100% { transform:translateX(0); }
+  20% { transform:translateX(-5px); } 40% { transform:translateX(5px); }
+  60% { transform:translateX(-3px); } 80% { transform:translateX(3px); }
+}
+.tile.add { background:transparent; border-style:dashed; color:var(--text-3); }
+#grid.editing .tile { animation:nudge 2.2s ease-in-out infinite; }
+@keyframes nudge { 0%,100%{transform:rotate(-.5deg)} 50%{transform:rotate(.5deg)} }
+
+/* Drag to rearrange. The wiggle uses transform, so it has to stop while a
+   tile is being dragged or the two fight over the same property. */
+#grid.dragging .tile { animation:none; }   /* FLIP sets its own transition inline */
+.tile.drag-ghost {
+  position:fixed; z-index:90; margin:0; pointer-events:none;
+  animation:none !important;
+  transform:scale(1.06); opacity:.95;
+  box-shadow:0 18px 40px rgba(0,0,0,.55);
+  cursor:grabbing;
+}
+#grid.editing .tile { touch-action:none; }   /* let a drag beat the scroller */
+.tile .del {
+  position:absolute; top:-6px; right:-6px; width:24px; height:24px;
+  border-radius:50%; background:var(--danger); color:#fff; border:none;
+  font-size:14px; line-height:1; display:grid; place-items:center;
+}
+#grid:not(.editing) .tile .del { display:none; }
+/* Built-ins can be removed or moved, not rewritten. */
+#grid.editing .tile.locked { opacity:.78; }
+#grid.editing .tile.locked::after {
+  content:"🔒"; position:absolute; bottom:4px; right:6px;
+  font-size:10px; opacity:.5;
+}
+.tile { position:relative; }
+
+
+/* ═══ Sheets ════════════════════════════════════════════════════════ */
+.sheet {
+  position:fixed; inset:0; z-index:80;
+  background:color-mix(in srgb,#000 55%,transparent);
+  display:flex; align-items:center; justify-content:center;
+  padding:var(--sp-4);
+  backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+}
+/* Centred, not bottom-anchored: these are dialogs you read and fill in, and
+   a centred card keeps the fields near the middle of the screen instead of
+   under your hand. Scrolls internally when the content is taller. */
+.sheet-inner {
+  width:min(720px,100%); max-height:86dvh; overflow-y:auto;
+  overscroll-behavior:contain;
+  background:var(--surface); border:1px solid var(--border-hi);
+  border-radius:var(--r-lg);
+  padding:var(--sp-4);
+  box-shadow:0 24px 64px rgba(0,0,0,.55);
+  animation:rise var(--dur) var(--ease);
+}
+.sheet.wide .sheet-inner { width:min(1040px,100%); }
+.sheet-inner.narrow { width:min(460px,100%); }
+.fail-msg { margin:0 0 var(--sp-3); font-size:15px; line-height:1.5; color:var(--text); }
+@keyframes rise { from{transform:translateY(12px) scale(.98); opacity:0} }
+.sheet-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:var(--sp-4); }
+.sheet-head h2 { margin:0; font-size:20px; font-weight:650; }
+
+.field { margin-bottom:var(--sp-4); }
+.field label, .switch span { display:block; font-size:13px; font-weight:600; color:var(--text-2); margin-bottom:6px; }
+.row2 { display:grid; grid-template-columns:1fr 110px; gap:var(--sp-3); }
+input[type=text],input[type=search],textarea,select {
+  width:100%; min-height:var(--tap); padding:0 var(--sp-3);
+  background:var(--surface-2); border:1px solid var(--border);
+  border-radius:var(--r-sm); -webkit-appearance:none;
+}
+textarea { padding:var(--sp-2) var(--sp-3); min-height:84px; resize:vertical; line-height:1.5; }
+input[type=range] { width:100%; height:var(--tap); accent-color:var(--accent); }
+/* − slider + Fit, on one line: the buttons are the precise 5% control, the
+   slider is for getting across the range quickly. */
+.stepper { display:flex; align-items:center; gap:var(--sp-2); }
+.stepper input[type=range] { flex:1; min-width:0; }
+.stepper .btn { flex:none; min-width:var(--tap); padding:0 var(--sp-3); }
+.stepper .btn.step { font-size:20px; line-height:1; }
+.switch { display:flex; align-items:center; justify-content:space-between;
+  min-height:var(--tap); padding:var(--sp-2) 0; border-top:1px solid var(--border); }
+.switch span { margin:0; }
+.switch input { width:52px; height:32px; accent-color:var(--accent); }
+output { float:right; color:var(--text-3); font-variant-numeric:tabular-nums; }
+
+.btn { min-height:var(--tap); padding:0 var(--sp-4); background:var(--surface-2);
+  border:1px solid var(--border); border-radius:var(--r-sm); font-weight:600; cursor:pointer; }
+.btn.small { min-height:36px; padding:0 var(--sp-3); font-size:13px; }
+.btn:active { background:var(--surface-3); }
+.btn.ghost { background:transparent; }
+.btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+.sheet-head .btn { margin-left:var(--sp-2); }
+/* The sliding Discard button owns its own margin so it collapses to nothing
+   when hidden, rather than leaving an 8px gap behind. */
+.sheet-head .btn.discard { margin-left:0; }
+.sheet-head .btn.discard.show { margin-left:var(--sp-2); }
+.btn.danger { color:var(--danger); border-color:color-mix(in srgb,var(--danger) 45%,var(--border)); }
+.ed-actions { display:flex; gap:var(--sp-2); margin-top:var(--sp-5); }
+.ed-actions .btn { flex:1; }
+
+#swatches { display:flex; flex-wrap:wrap; gap:var(--sp-2); }
+.swatch { width:var(--tap); height:var(--tap); border-radius:var(--r-sm);
+  border:2px solid transparent; cursor:pointer; }
+.swatch[aria-checked="true"] { border-color:var(--text); }
+.note { color:var(--text-3); font-size:13px; margin:0 0 var(--sp-3); }
+.devinfo { margin:0; display:grid; grid-template-columns:max-content 1fr; gap:6px var(--sp-4); font-size:14px; }
+.devinfo dt { color:var(--text-3); } .devinfo dd { margin:0; }
+
+/* ═══ Catalog ═══════════════════════════════════════════════════════ */
+#catlist { display:grid; gap:var(--sp-4); }
+.catgroup h3 { margin:0 0 var(--sp-2); font-size:12px; color:var(--text-3);
+  text-transform:uppercase; letter-spacing:.06em; }
+.catitems { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:var(--sp-2); }
+.catitem { display:flex; align-items:center; gap:var(--sp-2); min-height:var(--tap);
+  padding:var(--sp-2) var(--sp-3); background:var(--surface-2);
+  border:1px solid var(--border); border-radius:var(--r-sm); cursor:pointer; text-align:left; }
+.catitem .ico { font-size:18px; flex:none; }
+.catitem .t { flex:1; min-width:0; }
+.catitem .nm { font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.catitem .combo { font-size:11px; color:var(--text-3); }
+.catitem { position:relative; }
+.catdel {
+  position:absolute; top:-6px; right:-6px; width:20px; height:20px;
+  border-radius:50%; border:none; background:var(--danger); color:#fff;
+  font-size:11px; line-height:1; display:grid; place-items:center;
+  opacity:0; transition:opacity var(--dur-fast) var(--ease);
+}
+.catitem:hover .catdel, .catitem:focus-within .catdel { opacity:1; }
+@media (hover:none) { .catdel { opacity:.85; } }
+.catitem[data-on="1"] { border-color:var(--success); }
+.catitem[data-on="1"] .nm::after { content:" ✓"; color:var(--success); }
+
+/* ═══ Keyboard picker ═══════════════════════════════════════════════ */
+#kp-mods { display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-bottom:var(--sp-3); }
+.mod { min-height:var(--tap); padding:0 var(--sp-4); background:var(--surface-2);
+  border:1px solid var(--border); border-radius:var(--r-sm); cursor:pointer; font-weight:600; }
+.mod[aria-pressed="true"] { background:var(--accent); border-color:var(--accent); color:#fff; }
+.lk-combo {
+  margin-left:auto; margin-right:var(--sp-3);
+  font-size:20px; font-weight:700; color:var(--accent);
+  font-variant-numeric:tabular-nums; min-width:4ch; text-align:right;
+}
+#lk-keys { display:grid; gap:6px; }
+
+.kp-preview {
+  min-height:56px; display:flex; align-items:center; justify-content:center;
+  gap:var(--sp-2); flex-wrap:wrap;
+  background:var(--surface-2); border:1px solid var(--border);
+  border-radius:var(--r-sm); margin-bottom:var(--sp-3); padding:var(--sp-2);
+}
+/* The shortcut box in the editor is a button. Make it look like one you can
+   press without turning it into a plain button — it still has to read as the
+   place the current shortcut lives. */
+.kp-preview.tappable {
+  width:100%; flex-direction:column; gap:4px; cursor:pointer;
+  min-height:var(--tap); text-align:center;
+  transition:border-color var(--dur-fast) var(--ease),
+             background var(--dur-fast) var(--ease);
+}
+.kp-preview.tappable:hover { border-color:var(--border-hi); }
+.kp-preview.tappable:active { background:var(--surface-3); border-color:var(--accent); }
+.kp-hint { font-size:11px; color:var(--text-3); }
+
+.kp-chip {
+  font-size:17px; font-weight:700; padding:4px 12px;
+  background:var(--accent); color:#fff; border-radius:8px;
+}
+.kp-plus { color:var(--text-3); font-size:15px; }
+.kp-empty { color:var(--text-3); font-size:14px; font-weight:500; }
+
+/* Selected keys carry their position, so the order is readable at a glance. */
+.key { position:relative; }
+.key.picked {
+  background:var(--accent); border-color:var(--accent); color:#fff;
+}
+.kbadge {
+  position:absolute; top:-6px; right:-6px;
+  min-width:18px; height:18px; padding:0 4px;
+  display:grid; place-items:center;
+  background:var(--text); color:var(--bg);
+  border-radius:999px; font-size:10px; font-weight:800;
+  animation:badgeIn 180ms var(--ease);
+}
+@keyframes badgeIn { from { opacity:0; transform:scale(.4) translateY(4px); } }
+
+/* Fills up while held, so the half-second press has visible progress. */
+.key.holding { background:var(--surface-3); }
+.key.holding::before {
+  content:""; position:absolute; inset:0; border-radius:inherit;
+  background:color-mix(in srgb,var(--accent) 55%,transparent);
+  transform-origin:left; animation:holdFill 320ms linear forwards;
+}
+@keyframes holdFill { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+/* The live keyboard asks for a longer hold than the shortcut picker: there the
+   whole point is picking keys, here you are typing and a modifier latching by
+   accident sends a shortcut you never asked for. */
+.key.holding-long::before { animation-duration:1500ms; }
+#keyboard { display:grid; gap:6px; }
+.krow { display:flex; gap:6px; }
+.key { flex:1 1 0; min-width:0; min-height:46px; display:grid; place-items:center;
+  background:var(--surface-2); border:1px solid var(--border); border-radius:8px;
+  font-size:13px; cursor:pointer; padding:0 2px; }
+.key:active { background:var(--surface-3); }
+.key[aria-pressed="true"] { background:var(--accent); border-color:var(--accent); color:#fff; }
+.key.w15{flex-grow:1.5} .key.w20{flex-grow:2} .key.w25{flex-grow:2.5} .key.w60{flex-grow:6}
+.kgap { flex:0 0 var(--sp-3); }
+
+/* ═══ Gesture picker ════════════════════════════════════════════════ */
+#gp-tabs { display:flex; gap:var(--sp-2); margin-bottom:var(--sp-3); }
+#gp-list { display:grid; gap:var(--sp-2); }
+.gest { display:flex; align-items:center; gap:var(--sp-3); width:100%;
+  min-height:60px; padding:var(--sp-2) var(--sp-3); background:var(--surface-2);
+  border:1px solid var(--border); border-radius:var(--r-sm); cursor:pointer; text-align:left; }
+.gest .t { flex:1; min-width:0; }
+.gest .nm { font-weight:600; font-size:15px; }
+.gest .does { font-size:12px; color:var(--text-3); }
+.gest .tag { flex:none; font-size:11px; font-weight:600; padding:3px 8px;
+  border-radius:var(--r-pill); background:var(--surface-3); color:var(--text-2); }
+.gest .tag.native { background:color-mix(in srgb,var(--success) 22%,transparent); color:var(--success); }
+.gest .tag.mapped { background:color-mix(in srgb,var(--warning) 22%,transparent); color:var(--warning); }
+.gest[disabled] { opacity:.45; cursor:not-allowed; }
+.gest[disabled] .tag { background:color-mix(in srgb,var(--danger) 20%,transparent); color:var(--danger); }
+
+/* ═══ Toast ═════════════════════════════════════════════════════════ */
+#toast {
+  position:fixed; left:50%; bottom:32px; transform:translateX(-50%) translateY(12px);
+  background:var(--surface-3); border:1px solid var(--border-hi);
+  padding:var(--sp-3) var(--sp-4); border-radius:var(--r-pill);
+  font-size:14px; opacity:0; pointer-events:none; z-index:100;
+  transition:opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+#toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* ═══ Rotate prompt ═════════════════════════════════════════════════
+   Both layouts are landscape designs. Rather than reflow into something
+   cramped, ask for the rotation — it takes a second and the result is the
+   interface as intended. */
+.rotate {
+  position:fixed; inset:0; z-index:200; display:none;
+  align-items:center; justify-content:center; text-align:center;
+  background:var(--bg); padding:var(--sp-5);
+}
+.rotate-inner { max-width:320px; }
+.rotate-icon {
+  font-size:56px; color:var(--accent); margin-bottom:var(--sp-4);
+  animation:rotHint 2.4s ease-in-out infinite;
+}
+@keyframes rotHint { 0%,60%,100%{transform:rotate(0)} 30%{transform:rotate(90deg)} }
+.rotate h2 { margin:0 0 var(--sp-2); font-size:22px; }
+.rotate p { margin:0; color:var(--text-2); font-size:15px; line-height:1.5; }
+/* Only the iPad layout needs the width of landscape. The phone layout is
+   built for portrait — the way you actually hold a phone — so it must never
+   be told to turn sideways. */
+@media (orientation:portrait) {
+  body[data-layout="ipad"] .rotate:not(.busy) { display:flex; }
+}
+/* And the mirror image: the phone layout is built for portrait, so landscape
+   gets the same treatment the iPad gives portrait — a prompt, not a squashed
+   reflow of a layout that wants the height. */
+@media (orientation:landscape) {
+  body[data-layout="mobile"] .rotate:not(.busy) { display:flex; }
+}
+/* The lock screen is state-driven, not orientation-driven. */
+.busy { display:none; z-index:210; }
+.busy:not([hidden]) { display:flex; }
+
+/* While pointing, the phone is held FLAT — which iOS often reports as
+   portrait. The rotate prompt would then cover the whole app at exactly the
+   moment you are trying to use it, so it stands down for the duration. */
+body[data-air="1"] .rotate:not(.busy) { display:none !important; }
+
+#airhow .rotate-inner { max-width:400px; }
+/* Borrows the rotate prompt's own hint animation, so "hold it upright" and
+   "turn it sideways" read as the same instruction in two directions. */
+#airhow-ico.spin { animation:rotHint 2.4s ease-in-out infinite; }
+#airhow-diagram { margin:0 0 var(--sp-4); display:flex; justify-content:center; }
+.ph {
+  display:flex; flex-direction:column; justify-content:space-between;
+  width:120px; height:190px; padding:10px 8px;
+  border:2px solid var(--accent); border-radius:18px;
+  background:color-mix(in srgb,var(--accent) 12%,transparent);
+  font-size:9px; line-height:1.25; color:var(--text-2); text-align:center;
+}
+.ph-cam  { color:var(--accent); font-weight:700; }
+.ph-scr  { color:var(--text-3); }
+.ph-port { color:var(--accent); font-weight:700; }
+.airhow-acts {
+  display:flex; gap:var(--sp-2); justify-content:center; flex-wrap:wrap;
+  margin-top:var(--sp-4);
+}
+.airhow-acts .btn { min-width:110px; }
+.airhow-acts .btn:disabled { opacity:.4; }
+#airhow-p { white-space:pre-line; }
+
+/* ═══ Pane switcher (mobile only) ═══════════════════════════════════
+   A phone in landscape is ~740x390: enough width for one pane done
+   properly, not two done badly, and very little height to spare. */
+#panebar { display:none; }
+
+/* One layout skeleton for both: header across the top, rail down the left,
+   stage filling the rest. The rail used to be a phone-only affair; now it is
+   the only control for what shows, so it has to exist everywhere. */
+body {
+  display:grid;
+  /* minmax(0,…) not 1fr: a bare 1fr is minmax(auto,1fr), so a header too wide
+     to fit stretches the column and the whole page scrolls sideways instead
+     of the header trimming itself. */
+  grid-template-columns:54px minmax(0,1fr);
+  grid-template-rows:auto 1fr;
+}
+#bar     { grid-column:1 / -1; grid-row:1; }
+#panebar {
+  grid-column:1; grid-row:2;
+  display:flex; flex-direction:column; gap:5px;
+  padding:var(--sp-2) 0 var(--sp-2) var(--sp-2);
+}
+#stage   { grid-column:2; grid-row:2; }
+
+/* ── What is showing ────────────────────────────────────────────────────
+   Deck and Pad are independent toggles; hiding one gives the other the whole
+   stage. Hidden rather than animated, because the trackpad reads finger
+   positions from its own bounding box and a pane mid-transition reports a box
+   that is about to be wrong. */
+body[data-show="board"] #padcol,
+body[data-show="pad"]   #boardcol { display:none; }
+body[data-show="board"] #boardcol,
+body[data-show="pad"]   #padcol   { flex:1 1 100%; }
+
+/* Keys takes the lot, and gives it back untouched on the second press. */
+body[data-keys="1"] #boardcol,
+body[data-keys="1"] #padcol { display:none !important; }
+body[data-keys="1"] #keyscol { display:flex; flex-direction:column; }
+
+/* On a landscape phone the height is the scarce resource, so the switcher
+   goes down the side as a narrow rail instead of eating a horizontal strip.
+   A grid lets the header span the top while the rail and the pane share the
+   row beneath, with no extra wrapper element. */
+
+.pane-tab {
+  flex:1; min-height:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:2px;
+  background:var(--surface); color:var(--text-2);
+  border:1px solid var(--border); border-radius:var(--r-sm); cursor:pointer;
+}
+.pt-ico { font-size:17px; line-height:1; }
+.pt-lbl { font-size:9px; font-weight:700; letter-spacing:.02em; }
+/* These are toggles now, so the state is aria-pressed, not aria-selected —
+   the old selector silently stopped matching and nothing lit up at all.
+   Deliberately loud: on a board where two of three can be on at once, "which
+   am I looking at" has to be answerable at a glance. */
+.pane-tab[aria-pressed="true"] {
+  background:var(--accent); border-color:var(--accent); color:#fff;
+  box-shadow:0 0 0 1px var(--accent), 0 2px 10px color-mix(in srgb,var(--accent) 45%,transparent);
+}
+.pane-tab[aria-pressed="true"] .pt-ico,
+.pane-tab[aria-pressed="true"] .pt-lbl { color:#fff; }
+/* Off is legible but plainly off, rather than merely less bright. */
+.pane-tab[aria-pressed="false"] { opacity:.55; }
+.pane-tab[aria-pressed="false"]:active { opacity:1; }
+.pane-tab { transition:background var(--dur-fast) var(--ease),
+                        opacity var(--dur-fast) var(--ease),
+                        box-shadow var(--dur-fast) var(--ease); }
+
+/* The keyboard pane only exists on a phone; elsewhere it is a sheet. It never
+   scrolls: the rows share whatever height is left, so the whole keyboard is
+   always on screen. */
+#keyscol { display:none; flex:1; min-height:0; overflow:hidden; }
+#ik-keys {
+  flex:1; min-height:0; display:grid; gap:var(--key-gap);
+  /* Capped, not 1fr. Left to stretch, six rows filled 700px of portrait
+     screen and every key came out 34 wide by 104 tall — nothing about that
+     reads as a keyboard. A cap keeps the proportions and the slack goes
+     above, which is where a phone keyboard leaves it anyway. */
+  grid-auto-rows:minmax(0,var(--key-min));
+  align-content:end;
+}
+#ik-keys .krow { min-height:0; gap:var(--key-gap); }
+#ik-keys .key  { min-height:0; height:100%; font-size:var(--key-fs); }
+#ik-note { flex:none; }
+#ik-preview { flex:none; }
+
+
+/* ═══ Mobile layout ═════════════════════════════════════════════════
+   Chosen explicitly with the header button, not guessed from width — you
+   might want the phone layout on a tablet, or vice versa. Board on top,
+   trackpad below, because the lower half of a phone is the thumb's reach. */
+/* One pane at a time, each filling the whole landscape phone screen. */
+body[data-layout="mobile"] #stage {
+  flex-direction:column; gap:var(--sp-2);
+  padding:var(--sp-2) var(--sp-2) max(var(--sp-2),var(--pad-bottom));
+}
+body[data-layout="mobile"][data-lefty="1"] #stage { flex-direction:column; }
+body[data-layout="mobile"] #boardcol,
+body[data-layout="mobile"] #padcol { flex:1 1 auto; min-height:0; }
+
+/* Portrait phone: rail along the bottom rather than down the side.
+   390px of width is too precious to give 54 of it to a rail, and the bottom
+   edge is where a thumb already is. */
+body[data-layout="mobile"] {
+  grid-template-columns:minmax(0,1fr);
+  grid-template-rows:auto 1fr auto;
+}
+body[data-layout="mobile"] #bar     { grid-column:1; grid-row:1; }
+body[data-layout="mobile"] #stage   { grid-column:1; grid-row:2; }
+body[data-layout="mobile"] #panebar {
+  grid-column:1; grid-row:3;
+  flex-direction:row; gap:6px;
+  padding:var(--sp-2) var(--sp-2) max(var(--sp-2),var(--pad-bottom));
+}
+body[data-layout="mobile"] .pane-tab { min-height:52px; }
+
+body[data-layout="mobile"] #pad { flex:1; }
+/* The side rail already has a Keys tab, so the strip under the pad would be a
+   second way to reach the same thing. On iPad there is no rail, so it stays. */
+body[data-layout="mobile"] #modstrip { display:none; }
+
+/* Wide and short: the same scale knob, just starting from smaller bases,
+   because a landscape phone has ~390px of height to spend in total. */
+body[data-layout="mobile"] {
+  --gap:       calc(8px  * var(--ui));
+  --tile-min:  calc(76px * var(--ui));
+  --tile-ico:  calc(22px * var(--ui));
+  --tile-lbl:  calc(12px * var(--ui));
+  --tile-combo:calc(9px  * var(--ui));
+  --key-min:   calc(38px * var(--ui));
+  --key-fs:    calc(11px * var(--ui));
+  --key-gap:   calc(4px  * var(--ui));
+  --hint-fs:   calc(12px * var(--ui));
+}
+body[data-layout="mobile"] .key { padding:0 2px; }
+body[data-layout="mobile"] .tile {
+  gap:calc(4px * var(--ui)); padding:calc(6px * var(--ui));
+}
+/* The preview strip is a readout, not a control — it can afford to be short. */
+body[data-layout="mobile"] #ik-preview {
+  min-height:calc(34px * var(--ui)); margin-bottom:var(--key-gap);
+}
+body[data-layout="mobile"] #ik-note { margin-bottom:var(--key-gap); font-size:11px; }
+
+/* Centred on a phone too, not anchored to the bottom. In landscape the screen
+   is ~390px tall, so a bottom sheet at 94dvh was a full-height panel with a
+   rounded top edge and nothing else to distinguish it — and it put the fields
+   under your hand. Centred with its own scrollbar is the same dialog in both
+   layouts, which is the point. */
+body[data-layout="mobile"] .sheet { align-items:center; padding:var(--sp-2); }
+body[data-layout="mobile"] .sheet-inner {
+  max-height:calc(100dvh - var(--sp-4));
+  padding:var(--sp-3);
+  padding-bottom:max(var(--sp-3),var(--pad-bottom));
+}
+/* The head stays put while the fields scroll under it — on a short screen the
+   Done button would otherwise scroll away and strand you in the dialog. */
+.sheet-head {
+  position:sticky; top:calc(var(--sp-4) * -1); z-index:2;
+  background:var(--surface); padding-top:var(--sp-1);
+}
+body[data-layout="mobile"] .sheet-head { top:calc(var(--sp-3) * -1); }
+body[data-layout="mobile"] .key { min-height:38px; font-size:11px; }
+
+/* ═══ Portrait: stack, deck below the pad ═══════════════════════════ */
+@media (orientation:portrait) {
+  #stage { flex-direction:column; }
+  body[data-lefty="1"] #stage { flex-direction:column; }
+  #padcol   { flex:0 0 auto; }
+  #pad      { min-height:449px; }
+  #boardcol { flex:1 1 auto; }
+  .devpop { width:calc(100vw - 32px); }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  *,*::before,*::after { animation-duration:.01ms !important;
+    animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+}
+
+/* A phone in portrait is ~390px across and the header cannot hold prose at
+   that width. Trim to what you actually read mid-session: which Mac, how long,
+   the latency, and settings. The two switches keep their meaning but lose
+   their sentences — the tooltip and the aria-label still spell them out. */
+@media (max-width:520px) {
+  #bar { padding:0 var(--sp-2); gap:6px; }
+  .chip { max-width:none; flex:1 1 auto; min-width:0; padding:0 8px; }
+  .chip-name { font-size:13px; }
+  .timer { font-size:13px; min-width:44px; flex:none; }
+  .latency { font-size:12px; min-width:4ch; }
+  .icon-btn { min-width:36px; height:36px; padding:0 6px; }
+}

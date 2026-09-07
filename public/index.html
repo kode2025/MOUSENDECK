@@ -1,0 +1,412 @@
+<!doctype html>
+<!--
+  index.html — the app shell.
+
+  Every screen the client can show is present in the markup from the start and
+  toggled with [hidden], rather than being built by script on demand. On a
+  device that has just woken its Wi-Fi radio, a screen that has to be
+  constructed before it can appear is a screen that appears late.
+
+  The screens, in document order:
+    #bar        header — device chip, session timer, latency, settings
+    #panebar    the Deck / Pad / Keys toggles
+    #stage      the board (#boardcol), the trackpad (#padcol), the keyboard
+    #busy       another device holds control, with an explicit Take over
+    #launch     asked once per launch: Pointer, or Trackpad & Deck
+    #airui      the air pointer's own full-screen UI
+    #airhow     posture and calibration prompts for the air pointer
+    #airset     pointer settings — only what has an effect while pointing
+    #rotate     "turn the device the right way" for the current layout
+    #settings   everything else
+    #editor     build or change a custom button
+    #catalog    the built-in shortcut picker
+    #keypick    record a key combination in press order
+    #gesturepick  which trackpad gesture a button imitates
+
+  There is no style or layout switch anywhere in here: the shortcut vocabulary
+  comes from the machine that answers and the layout from the screen in your
+  hand, so a button could only ever disagree with the truth.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MouseNDeck</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<!-- Opaque, not black-translucent: on a home-button iPad every
+     env(safe-area-inset-*) reports 0, so a translucent bar would let the
+     header render underneath the clock and battery. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="MouseNDeck">
+<meta name="theme-color" content="#0B0C0F">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header id="bar">
+  <!-- Leading 132px is the iPadOS 26 window-controls safe zone: never
+       put anything tappable here. -->
+  <div id="brand" aria-hidden="true">MouseNDeck</div>
+
+  <div id="devchip" class="chip" hidden>
+    <span class="dot" id="dot" aria-hidden="true"></span>
+    <span class="chip-name" id="devname">—</span>
+  </div>
+  <span id="timer" class="timer" role="timer" aria-live="off" hidden>00:00</span>
+  <!-- No style or layout switch. Both are detected: the shortcut vocabulary
+       from the machine that answers, the layout from the screen in your hand.
+       A button here could only ever disagree with the truth. -->
+
+
+  <div class="spacer"></div>
+
+  <!-- Always visible: the server runs only while the terminal holds it, and
+       people forget it is there. -->
+  <span id="cleanup" class="cleanup">
+    Finished? Run <code>disconnect</code> in Terminal
+  </span>
+
+  <span id="latency" class="latency" aria-live="off"></span>
+  <button id="gear" class="icon-btn" aria-label="Settings">⚙</button>
+</header>
+
+<!-- Three toggles, not three tabs. Deck and Pad each turn themselves on and
+     off, so having both on is just both being on. Keys is different: it takes
+     the whole stage and hands it back on the second press. -->
+<div id="panebar" role="group" aria-label="What to show">
+  <button class="pane-tab" data-pane="board" aria-pressed="true" aria-label="Shortcuts">
+    <span class="pt-ico" aria-hidden="true">▦</span><span class="pt-lbl">Deck</span>
+  </button>
+  <button class="pane-tab" data-pane="pad" aria-pressed="true" aria-label="Trackpad">
+    <span class="pt-ico" aria-hidden="true">⬚</span><span class="pt-lbl">Pad</span>
+  </button>
+  <button class="pane-tab" data-pane="keys" aria-pressed="false" aria-label="Keyboard">
+    <span class="pt-ico" aria-hidden="true">⌨</span><span class="pt-lbl">Keys</span>
+  </button>
+</div>
+
+<main id="stage" data-connected="0">
+  <!-- Deck LEFT: on a desk this mirrors keyboard-left / mouse-right, and
+       when held the left thumb reaches column 1. Flippable in Settings. -->
+  <section id="boardcol" aria-label="Shortcut board">
+    <div id="boardhead">
+      <button id="boardswitch" aria-haspopup="menu" aria-expanded="false">
+        <span id="boardname">Main</span><span class="caret" aria-hidden="true">▾</span>
+      </button>
+      <div class="spacer"></div>
+      <button id="delboard" class="icon-btn small danger-btn" aria-label="Delete this board">🗑</button>
+      <button id="discard" class="head-btn discard">Discard changes</button>
+      <button id="editmode" class="head-btn" aria-pressed="false">Edit</button>
+    </div>
+    <div id="boardmenu" role="menu" hidden></div>
+    <div id="grid" role="group" aria-label="Shortcut buttons"></div>
+  </section>
+
+  <!-- Trackpad RIGHT: dominant hand, directly under the Connect pill. -->
+  <section id="padcol" aria-label="Trackpad">
+    <div id="pad" role="application"
+         aria-label="Trackpad. Drag to move the pointer, tap to click, two fingers to scroll.">
+      <!-- On the pad in both layouts, because the pad is what they change.
+           The pad calls preventDefault on every touch to stop iOS scrolling,
+           which also cancels the synthesised click on anything inside it — so
+           these bind their own touch handlers and stop propagation. -->
+      <div id="padbtns">
+        <button id="airbtn" class="pad-btn" aria-pressed="false"
+                aria-label="Air pointer (gyroscope)">✥</button>
+      </div>
+      <div id="padhint">
+        <span>drag to move · tap to click · two-finger tap right-clicks</span>
+        <span>rest one finger and slide another to click-and-drag</span>
+        <span>two fingers scroll or pinch · three fingers swipe between spaces</span>
+      </div>
+    </div>
+    <div id="modstrip" role="group" aria-label="Sticky modifier keys"></div>
+    <input id="kbinput" autocomplete="off" autocapitalize="off" autocorrect="off"
+           spellcheck="false" aria-label="Type to the connected computer">
+  </section>
+
+  <section id="keyscol" aria-label="Keyboard">
+    <p class="note" id="ik-note"></p>
+    <div id="ik-preview" class="kp-preview" aria-live="polite"></div>
+    <div id="ik-keys" role="group" aria-label="On-screen keyboard"></div>
+  </section>
+
+  <p id="notconnected" class="notconnected">Reconnecting…</p>
+</main>
+
+<!-- Both layouts are built for landscape; portrait gets a nudge, not a
+     squeezed-up version of a layout that needs the width. -->
+<!-- Shown when another device already holds control. -->
+<div id="busy" class="rotate busy" hidden>
+  <div class="rotate-inner">
+    <div class="rotate-icon">🔒</div>
+    <h2 id="busy-h">Already in use</h2>
+    <p id="busy-p">Another device is controlling this Mac.</p>
+    <button id="busy-take" class="btn primary" style="margin-top:20px">Take over</button>
+  </div>
+</div>
+
+<!-- The air pointer's posture is not a suggestion: the axis mapping below is
+     derived from one specific way of holding the phone, and any other way
+     sends the cursor somewhere else entirely. So it is a gate, not a hint. -->
+<!-- Asked once per launch. The two modes want the phone held differently —
+     flat for pointing, sideways for everything else — so it is worth settling
+     before you have picked the phone up wrong. -->
+<div id="launch" class="rotate busy" role="dialog" aria-modal="true" hidden>
+  <div class="rotate-inner">
+    <div class="rotate-icon">🎛</div>
+    <h2>How do you want to use it?</h2>
+    <div class="launch-opts">
+      <button id="launch-pointer" class="launch-opt">
+        <span class="lo-ico">✥</span>
+        <span class="lo-name">Pointer</span>
+        <span class="lo-sub">Aim the phone like a TV remote.<br>Held flat, screen up.</span>
+      </button>
+      <button id="launch-app" class="launch-opt">
+        <span class="lo-ico">▦</span>
+        <span class="lo-name">Trackpad &amp; Deck</span>
+        <span class="lo-sub">Shortcuts, trackpad and keyboard.<br>Held sideways.</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="airui" aria-label="Pointer mode">
+  <div id="airui-head">
+    <div>
+      <p id="airui-title">POINTING</p>
+      <p id="airui-sub">aim the phone · flat, port toward you</p>
+    </div>
+    <button id="air-gear" class="pad-btn" aria-label="Pointer settings">⚙</button>
+  </div>
+  <button id="air-exit" aria-label="Exit pointer mode">✥&nbsp; Exit pointer</button>
+  <div id="airui-clicks">
+    <button id="air-left" class="air-big" aria-label="Left click">
+      <span class="air-ico">●</span><span class="air-lbl">Left</span>
+    </button>
+    <!-- Between the two clicks, where a real mouse puts its wheel. Aiming does
+         not scroll, so without this there is no way to move a page while
+         pointing. -->
+    <div id="air-scroll" role="application" aria-label="Scroll — drag up or down">
+      <span class="air-sc-ico" aria-hidden="true">⇕</span>
+      <span class="air-sc-lbl">scroll</span>
+    </div>
+    <button id="air-right" class="air-big" aria-label="Right click">
+      <span class="air-ico">◐</span><span class="air-lbl">Right</span>
+    </button>
+  </div>
+</div>
+
+<!-- Only the settings that do something while pointing. Pointer speed and
+     acceleration belong to the trackpad and board columns to the deck; showing
+     them here would be four sliders you cannot feel the effect of. -->
+<div id="airset" class="sheet" role="dialog" aria-modal="true" aria-labelledby="airset-h" hidden>
+  <div class="sheet-inner narrow">
+    <div class="sheet-head">
+      <h2 id="airset-h">Pointer</h2>
+      <button class="btn" data-close="airset">Done</button>
+    </div>
+
+    <div class="field"><label for="p-air">Pointer speed <output id="p-out-air"></output></label>
+      <input type="range" id="p-air" min="5" max="60" step="1">
+      <p class="note">How far the cursor travels for the same tilt of the phone.</p></div>
+
+    <label class="switch"><span>Invert vertically</span><input type="checkbox" id="p-airinv"></label>
+
+    <div class="field" style="margin-top:var(--sp-4)">
+      <label for="p-scroll">Scroll speed <output id="p-out-scroll"></output></label>
+      <input type="range" id="p-scroll" min="0.2" max="4" step="0.1">
+      <p class="note">How far a drag down the middle lane moves the page.</p></div>
+
+    <label class="switch"><span>Natural scrolling</span><input type="checkbox" id="p-natural"></label>
+
+    <div class="ed-actions">
+      <button class="btn" id="p-recal">Recalibrate</button>
+    </div>
+    <p class="note">Recalibrating re-measures which sensor your phone puts each
+      motion on — two movements, about five seconds.</p>
+  </div>
+</div>
+
+<div id="airhow" class="rotate busy" role="dialog" aria-modal="true" hidden>
+  <div class="rotate-inner">
+    <div class="rotate-icon" id="airhow-ico">📱</div>
+    <h2 id="airhow-h">Hold it like a remote</h2>
+    <div id="airhow-diagram" aria-hidden="true">
+      <div class="ph"><span class="ph-cam">▪ camera edge — away from you</span>
+        <span class="ph-scr">screen facing UP</span>
+        <span class="ph-port">charging port — toward you</span></div>
+    </div>
+    <p id="airhow-p"></p>
+    <div class="airhow-acts">
+      <button id="airhow-cancel" class="btn">Cancel</button>
+      <button id="airhow-recal" class="btn">Calibrate</button>
+      <button id="airhow-go" class="btn primary">Start pointing</button>
+    </div>
+  </div>
+</div>
+
+<div id="rotate" class="rotate" aria-hidden="true">
+  <div class="rotate-inner">
+    <div class="rotate-icon">⟳</div>
+    <h2 id="rotate-h">Turn your device sideways</h2>
+    <p id="rotate-p">The iPad layout needs landscape — the trackpad and board
+       both want the width.</p>
+  </div>
+</div>
+
+<!-- ══ Settings ══════════════════════════════════════════════════════ -->
+<div id="settings" class="sheet" role="dialog" aria-modal="true" aria-labelledby="set-h" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head"><h2 id="set-h">Settings</h2><button class="btn" data-close="settings">Done</button></div>
+
+    <div class="field"><label for="zoom">Interface size <output id="out-zoom"></output></label>
+      <div class="stepper">
+        <button class="btn step" id="zoom-out" aria-label="Smaller, 5 percent">−</button>
+        <input type="range" id="zoom" min="50" max="150" step="5">
+        <button class="btn step" id="zoom-in" aria-label="Bigger, 5 percent">＋</button>
+        <button class="btn" id="zoom-fit">Fit</button>
+      </div>
+      <p class="note">Scales the deck, trackpad and keyboard 5% at a time.
+        <strong>Fit</strong> brings the whole board back on screen — full size
+        if it will hold, smaller if the screen is short. Remembered per device,
+        and separately for the iPad and mobile layouts.</p></div>
+
+    <div class="field"><label for="sens">Pointer speed <output id="out-sens"></output></label>
+      <input type="range" id="sens" min="0.4" max="5" step="0.1">
+      <p class="note">How far the cursor travels for the same finger movement.
+        Higher crosses the screen faster but is harder to aim.</p></div>
+
+    <div class="field"><label for="accel">Acceleration <output id="out-accel"></output></label>
+      <input type="range" id="accel" min="0" max="4" step="0.1">
+      <p class="note">How much a <em>fast</em> swipe is amplified over a slow one.
+        At 0 the speed is constant; higher lets you cross the screen quickly
+        while still placing the cursor precisely when moving slowly.</p></div>
+
+    <div class="field"><label for="airspeed">Air pointer speed <output id="out-air"></output></label>
+      <input type="range" id="airspeed" min="5" max="60" step="1">
+      <p class="note">How far the cursor travels for the same tilt of the phone,
+        when the air pointer is on. The ✥ button on the trackpad turns it on;
+        it needs the server started with plain <code>connect</code>, which
+        serves HTTPS — iOS only gives the gyroscope to a secure page.</p></div>
+    <label class="switch"><span>Invert air pointer vertically</span><input type="checkbox" id="airinvert"></label>
+
+    <div class="field"><label for="scrollspeed">Scroll speed <output id="out-scroll"></output></label>
+      <input type="range" id="scrollspeed" min="0.2" max="4" step="0.1">
+      <p class="note">How far two-finger scrolling moves the page.</p></div>
+
+    <div class="field"><label for="cols">Board columns <output id="out-cols"></output></label>
+      <input type="range" id="cols" min="3" max="6" step="1">
+      <p class="note" id="colnote"></p>
+      <p class="note">Fewer columns means larger, easier-to-hit buttons;
+        more fits additional shortcuts on one screen.</p></div>
+    <label class="switch"><span>Natural scrolling</span><input type="checkbox" id="natural"></label>
+    <label class="switch"><span>Tap to click</span><input type="checkbox" id="taptoclick"></label>
+    <label class="switch"><span>Left-handed (trackpad on left)</span><input type="checkbox" id="lefty"></label>
+    <div class="sheet-head" style="margin-top:24px"><h2>Connected device</h2></div>
+    <dl id="devinfo" class="devinfo"></dl>
+  </div>
+</div>
+
+<!-- ══ Button editor ═════════════════════════════════════════════════ -->
+<div id="editor" class="sheet" role="dialog" aria-modal="true" aria-labelledby="ed-h" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head"><h2 id="ed-h">Button</h2><button class="btn" data-close="editor">Done</button></div>
+    <div class="row2">
+      <div class="field"><label for="e-label">Label</label><input type="text" id="e-label" placeholder="Copy"></div>
+      <div class="field"><label for="e-icon">Icon</label>
+        <input type="text" id="e-icon" placeholder="⧉" maxlength="4"></div>
+    </div>
+    <p class="note">
+      Paste any emoji or symbol. Need something specific?
+      <a href="https://www.flaticon.com" target="_blank" rel="noopener">Browse flaticon.com</a>
+      and copy an icon in.
+    </p>
+    <div class="field"><label>Colour</label><div id="swatches" role="radiogroup" aria-label="Button colour"></div></div>
+    <div class="field"><label for="e-type">Action</label><select id="e-type"></select></div>
+    <div id="fields"></div>
+    <div class="ed-actions">
+      <button class="btn" id="e-test">Test</button>
+      <button class="btn danger" id="e-delete">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Catalog ═══════════════════════════════════════════════════════ -->
+<div id="catalog" class="sheet" role="dialog" aria-modal="true" aria-labelledby="cat-h" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head">
+      <h2 id="cat-h">Add shortcut</h2>
+      <div class="spacer"></div>
+      <button class="btn primary" id="cat-custom">＋ Custom</button>
+      <button class="btn danger discard" id="cat-discard">Discard changes</button>
+      <button class="btn" id="cat-done">Done</button>
+    </div>
+    <input type="search" id="catsearch" placeholder="Search shortcuts…" aria-label="Search shortcuts">
+    <p class="note" id="catnote"></p>
+    <div id="catlist"></div>
+  </div>
+</div>
+
+<!-- ══ Full keyboard picker ══════════════════════════════════════════ -->
+<div id="keypick" class="sheet wide" role="dialog" aria-modal="true" aria-labelledby="kp-h" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head">
+      <h2 id="kp-h">Shortcut</h2>
+      <div class="spacer"></div>
+      <button class="btn danger" id="kp-discard">Discard changes</button>
+      <button class="btn primary" id="kp-save">Save shortcut</button>
+      <button class="btn" id="kp-done">Done</button>
+    </div>
+    <p class="note" id="kp-note"></p>
+    <div id="kp-preview" class="kp-preview" aria-live="polite"></div>
+    <div id="keyboard" role="group" aria-label="Keyboard"></div>
+  </div>
+</div>
+
+<!-- ══ Gesture picker ════════════════════════════════════════════════ -->
+<div id="gesturepick" class="sheet" role="dialog" aria-modal="true" aria-labelledby="gp-h" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head"><h2 id="gp-h">Trackpad gesture</h2><button class="btn" data-close="gesturepick">Done</button></div>
+    <div id="gp-tabs" role="tablist" aria-label="Trackpad type"></div>
+    <p class="note" id="gp-note"></p>
+    <div id="gp-list"></div>
+  </div>
+</div>
+
+<!-- ══ Live on-screen keyboard ═══════════════════════════════════════ -->
+<div id="livekb" class="sheet wide" role="dialog" aria-modal="true" aria-labelledby="lk-h" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-head">
+      <h2 id="lk-h">Keyboard</h2>
+      <span id="lk-combo" class="lk-combo" aria-live="polite"></span>
+      <button class="btn" data-close="livekb">Done</button>
+    </div>
+    <p class="note" id="lk-note"></p>
+    <div id="lk-keys" role="group" aria-label="On-screen keyboard"></div>
+  </div>
+</div>
+
+<!-- ══ Action failure ════════════════════════════════════════════════
+     A toast is the right size for "Spotify is not installed" and the wrong
+     size for a permission fix, which needs the actual steps. -->
+<div id="failure" class="sheet" role="dialog" aria-modal="true" aria-labelledby="fail-h" hidden>
+  <div class="sheet-inner narrow">
+    <div class="sheet-head">
+      <h2 id="fail-h">That didn't run</h2>
+      <button class="btn" data-close="failure">Close</button>
+    </div>
+    <p id="fail-p" class="fail-msg"></p>
+    <p class="note" id="fail-hint"></p>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="catalog.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
