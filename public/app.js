@@ -1381,7 +1381,8 @@ function padHint() {
        'use ● and ◐ to click · ✥ turns it off']
     : ['drag to move · tap to click · two-finger tap right-clicks',
        'rest one finger and slide another to click-and-drag',
-       'two fingers scroll or pinch · three fingers swipe between spaces'];
+       'two fingers scroll or pinch · three fingers swipe between spaces',
+       'or use ‹ › below if your device keeps the swipes for itself'];
   h.innerHTML = '';
   for (const l of lines) h.appendChild(el('span', null, l));
 }
@@ -3087,6 +3088,18 @@ $('p-recal').addEventListener('click', () => {
 padButton('air-gear', () => { syncAirSettings(); openSheet('airset'); });
 
 padButton('airbtn', toggleAir);
+
+// The swipe equivalents, as buttons. They go through gestureSet() rather than
+// hardcoding ⌃← / ⌃→, so they speak whatever the connected machine speaks —
+// press "next desktop" against a Windows host and it sends ⊞+Ctrl+→ instead.
+for (const [id, dir, why] of [
+  ['desk-prev',    'left',  'previous desktop'],
+  ['desk-mission', 'up',    'mission control'],
+  ['desk-windows', 'down',  'application windows'],
+  ['desk-next',    'right', 'next desktop'],
+]) {
+  padButton(id, () => { fireCombo(gestureSet()[3][dir], why); flashPad(id); });
+}
 // The pointer screen's own controls. Same touch binding: these sit over a
 // surface that cancels synthesised clicks, and a click that does not register
 // while you are looking at the Mac is worse than no button at all.

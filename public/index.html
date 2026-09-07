@@ -121,6 +121,17 @@
            from "the gesture never arrived", and those have completely
            different fixes. -->
       <div id="padfingers" aria-hidden="true"><span id="padfingers-n">0</span></div>
+      <!-- The same four things the three- and four-finger swipes do, as
+           buttons. Not a duplicate for its own sake: iPadOS claims multi-finger
+           swipes system-wide and never forwards them to a web page, so on some
+           devices the gesture cannot arrive no matter what this app does. A
+           button cannot be intercepted. Present in both layouts. -->
+      <div id="paddesk" role="group" aria-label="Desktops and windows">
+        <button id="desk-prev" class="pad-btn desk" aria-label="Previous desktop">‹</button>
+        <button id="desk-mission" class="pad-btn desk" aria-label="Mission Control">⤢</button>
+        <button id="desk-windows" class="pad-btn desk" aria-label="Application windows">⧉</button>
+        <button id="desk-next" class="pad-btn desk" aria-label="Next desktop">›</button>
+      </div>
       <div id="padbtns">
         <button id="airbtn" class="pad-btn" aria-pressed="false"
                 aria-label="Air pointer (gyroscope)">✥</button>

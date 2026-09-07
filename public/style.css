@@ -234,6 +234,24 @@ body[data-lefty="1"] #stage { flex-direction:row-reverse; }
   color:var(--text-3); font-size:var(--hint-fs); text-align:center;
   pointer-events:none;
 }
+/* Along the bottom edge, away from both the ✥ button and the middle of the
+   pad where gestures actually happen. A .pad-btn is excluded from gesture
+   handling, so anything placed here is area the trackpad loses — which is why
+   it is a thin strip in a corner rather than a comfortable row of big keys. */
+#paddesk {
+  position:absolute; left:10px; bottom:10px; z-index:2;
+  display:flex; flex-direction:row; gap:6px;
+}
+.pad-btn.desk {
+  min-width:38px; height:34px; font-size:16px;
+  opacity:.55; transition:opacity .15s ease, background .15s ease;
+}
+.pad-btn.desk:active { opacity:1; background:var(--accent);
+  border-color:var(--accent); color:#fff; }
+/* Out of the way while aiming — the pointer screen replaces the pad anyway,
+   but the pad is still underneath it. */
+body[data-air="1"] #paddesk { display:none; }
+
 /* Sits opposite the pad buttons so a finger reaching for ✥ never covers it. */
 #padfingers {
   position:absolute; top:10px; left:10px; z-index:2;
