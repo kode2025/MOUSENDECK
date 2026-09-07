@@ -841,6 +841,30 @@ used rather than the Fn-arrow spellings.
 This list is printed on the pad permanently, so the moment you need reminding
 is not the moment it has faded out.
 
+### The buttons along the bottom of the pad
+
+The same four things, as buttons, in both layouts:
+
+| Button | Does |
+|---|---|
+| **‹** | Previous desktop *(Windows: previous virtual desktop)* |
+| **⤢** | Mission Control *(Windows: Task View)* |
+| **⧉** | Application windows *(Windows: Show Desktop)* |
+| **›** | Next desktop |
+
+Not a duplicate for its own sake. **iPadOS claims three- and four-finger
+swipes system-wide** for Undo/Redo and the App Switcher, and never forwards
+them to a web page — so on some devices the gesture cannot arrive no matter
+what this app does. `preventDefault()` and `touch-action: none` both sit
+below the system gesture layer, and nothing in a web page reaches under it.
+A button cannot be intercepted.
+
+They go through the same gesture table as the swipes, so they speak whatever
+the connected machine speaks — press **›** against a Windows host and it
+sends ⊞+Ctrl+→ instead. They sit in the bottom-left corner, dimmed until
+pressed, and deliberately small: a button on the pad is area the trackpad
+gives up.
+
 ### The details that took work
 
 - **Speed-based acceleration**, like a real trackpad: move slowly and the
