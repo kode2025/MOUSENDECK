@@ -14,7 +14,8 @@
     "test:actions": "node test/actions.mjs",
     "test:persistence": "node test/persistence.mjs",
     "bench": "node test/latency.mjs",
-    "test:spaces": "node test/spaces.mjs"
+    "test:spaces": "node test/spaces.mjs",
+    "test:keydiff": "node test/keydiff.mjs"
   },
   "engines": {
     "node": ">=18"
