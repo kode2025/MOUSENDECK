@@ -168,20 +168,44 @@ func flags(from mods: [String]) -> CGEventFlags {
     return f
 }
 
-/// The four arrow keys, which macOS treats as part of the numeric keypad.
+/// The four arrow keys, and the flags a REAL one carries on an Apple
+/// keyboard. These were measured, not reasoned about — three earlier guesses
+/// at this were all wrong, and `npm run test:keydiff` prints the comparison
+/// that settled it:
 ///
-/// This is not a quirk of ours — on real hardware the arrows are reported in
-/// the keypad group of the HID descriptor, so every genuine arrow keystroke
-/// arrives with NX_NUMERICPADMASK set. The system hotkey layer that owns
-/// Mission Control and Spaces matches on the WHOLE flag set, so a synthetic
-/// ⌃← without that bit never matches the registered hotkey and silently does
-/// nothing.
+///     real       ⌃→   0xa40101   [ctrl + fn + numpad]
+///     synthetic  ⌃→   0x20240000 [ctrl +      numpad]
 ///
-/// The confusing part, and why this took finding: the same event works fine
-/// for moving a text cursor, because an app just reads the key code and does
-/// not care about the flag. So arrows appear to work everywhere except the
-/// one place you were using them — switching desktops.
+/// Two surprises in that one line:
+///
+///  · NX_SECONDARYFNMASK. On an Apple keyboard the arrows sit in the Fn
+///    cluster, so every genuine arrow keystroke carries the Fn bit — even
+///    though nobody holds Fn to press one.
+///  · NX_DEVICELCTLKEYMASK. A real modifier says WHICH physical key is down,
+///    not merely that "a control key" is.
+///
+/// The system hotkeys the WindowServer owns — switching Spaces, Mission
+/// Control — match the whole word. Miss any bit and the keystroke is ignored
+/// in silence, while the very same event still works perfectly for moving a
+/// text cursor, because an app only reads the key code.
 let arrowKeyCodes: Set<CGKeyCode> = [123, 124, 125, 126]   // left right down up
+
+/// What a real arrow keystroke adds on top of the modifiers you asked for.
+let arrowExtraFlags = CGEventFlags(rawValue:
+    CGEventFlags.maskNumericPad.rawValue | CGEventFlags.maskSecondaryFn.rawValue)
+
+/// Device-specific modifier bits. The generic mask says "control is down";
+/// these say which control key, which is what a keyboard actually reports.
+let modDeviceBits: [String: UInt64] = [
+    "cmd": 0x08, "command": 0x08, "meta": 0x08,     // NX_DEVICELCMDKEYMASK
+    "shift": 0x02,                                   // NX_DEVICELSHIFTKEYMASK
+    "alt": 0x20, "option": 0x20, "opt": 0x20,        // NX_DEVICELALTKEYMASK
+    "ctrl": 0x01, "control": 0x01,                   // NX_DEVICELCTLKEYMASK
+]
+
+/// Set on every real keystroke; it means "this event was not merged with a
+/// previous one". Cheap to include and part of matching the real word.
+let nonCoalesced = CGEventFlags(rawValue: 0x100)
 
 func pressKey(_ key: String, mods: [String]) {
     guard let code = keyCodes[key.lowercased()] else {
@@ -189,7 +213,9 @@ func pressKey(_ key: String, mods: [String]) {
         return
     }
     var f = flags(from: mods)
-    if arrowKeyCodes.contains(code) { f.insert(.maskNumericPad) }
+    f.insert(nonCoalesced)
+    for m in mods { f.insert(CGEventFlags(rawValue: modDeviceBits[m.lowercased()] ?? 0)) }
+    if arrowKeyCodes.contains(code) { f.formUnion(arrowExtraFlags) }
 
     // Build the events BEFORE touching any modifier, so a failure here can
     // never leave Control stuck down on someone's Mac.
@@ -212,6 +238,7 @@ func pressKey(_ key: String, mods: [String]) {
     for m in mods {
         guard let mc = modKeyCodes[m.lowercased()] else { continue }
         running.insert(flagFor(m))
+        running.insert(CGEventFlags(rawValue: modDeviceBits[m.lowercased()] ?? 0))
         if let md = CGEvent(keyboardEventSource: src, virtualKey: mc, keyDown: true) {
             md.flags = running
             md.post(tap: .cghidEventTap)
@@ -228,6 +255,7 @@ func pressKey(_ key: String, mods: [String]) {
     for m in mods.reversed() {
         guard let mc = modKeyCodes[m.lowercased()] else { continue }
         running.remove(flagFor(m))
+        running.remove(CGEventFlags(rawValue: modDeviceBits[m.lowercased()] ?? 0))
         if let mu = CGEvent(keyboardEventSource: src, virtualKey: mc, keyDown: false) {
             mu.flags = running
             mu.post(tap: .cghidEventTap)
