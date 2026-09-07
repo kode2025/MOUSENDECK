@@ -155,12 +155,28 @@ func flags(from mods: [String]) -> CGEventFlags {
     return f
 }
 
+/// The four arrow keys, which macOS treats as part of the numeric keypad.
+///
+/// This is not a quirk of ours — on real hardware the arrows are reported in
+/// the keypad group of the HID descriptor, so every genuine arrow keystroke
+/// arrives with NX_NUMERICPADMASK set. The system hotkey layer that owns
+/// Mission Control and Spaces matches on the WHOLE flag set, so a synthetic
+/// ⌃← without that bit never matches the registered hotkey and silently does
+/// nothing.
+///
+/// The confusing part, and why this took finding: the same event works fine
+/// for moving a text cursor, because an app just reads the key code and does
+/// not care about the flag. So arrows appear to work everywhere except the
+/// one place you were using them — switching desktops.
+let arrowKeyCodes: Set<CGKeyCode> = [123, 124, 125, 126]   // left right down up
+
 func pressKey(_ key: String, mods: [String]) {
     guard let code = keyCodes[key.lowercased()] else {
         FileHandle.standardError.write("mdinput: unknown key '\(key)'\n".data(using: .utf8)!)
         return
     }
-    let f = flags(from: mods)
+    var f = flags(from: mods)
+    if arrowKeyCodes.contains(code) { f.insert(.maskNumericPad) }
     guard let down = CGEvent(keyboardEventSource: src, virtualKey: code, keyDown: true),
           let up   = CGEvent(keyboardEventSource: src, virtualKey: code, keyDown: false)
     else { return }
