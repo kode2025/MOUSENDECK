@@ -2083,6 +2083,67 @@ To press a single button from the command line, without picking up the iPad:
 node test/press.mjs Finder
 ```
 
+### Diagnostics
+
+Two tools for when something works on the Mac but not from the device. Both
+must be run **from your own terminal** — Accessibility is granted to whatever
+app launches a process, so anywhere else they report "untrusted" no matter what
+you have ticked in System Settings.
+
+```bash
+npm run test:spaces
+```
+
+Cuts the phone, the network and the server out of the picture. Checks
+Accessibility, checks whether the Spaces shortcuts are even switched on in
+System Settings, then fires ⌃→ and ⌃← directly at the input helper while you
+watch the screen. If the desktop moves, the Mac is fine and the problem is the
+gesture; if it does not, the problem is the keystroke.
+
+```bash
+npm run test:keydiff
+```
+
+Compares a **real** keystroke with the one this project synthesises. It fires
+our chord, waits for you to press the same one on your Mac's keyboard, and
+prints both flag words side by side with the difference named.
+
+This exists because three separate attempts at making ⌃← / ⌃→ switch Spaces
+failed, and every one was a guess about what a real keypress looks like.
+Guessing is the wrong method when the real thing is one key press away. The
+measurement it produced:
+
+```
+real       ⌃→   0xa40101   [ctrl + fn + numpad]
+synthetic  ⌃→   0x20240000 [ctrl +      numpad]
+```
+
+Two surprises in one line. **`NX_SECONDARYFNMASK`** — on an Apple keyboard the
+arrow keys sit in the Fn cluster, so every genuine arrow keystroke carries the
+Fn bit, even though nobody holds Fn to press one. And
+**`NX_DEVICELCTLKEYMASK`** — a real modifier says *which* physical key is
+down, not merely that "a control key" is.
+
+The system hotkeys the WindowServer owns match the whole word, so missing any
+bit means silent rejection — while the very same event still moves a text
+cursor perfectly, because an app only reads the key code. That is what made it
+hard to find.
+
+### Every script
+
+| Command | Needs a server? | Does |
+|---|---|---|
+| `npm start` | — | Runs the server directly. `connect` is the friendlier way |
+| `npm run build` | — | Compiles the Swift input helper |
+| `npm run setup` | — | Build, then start |
+| `npm test` | no | Console + persistence suites |
+| `npm run test:persistence` | no | A save is never claimed unless it happened |
+| `npm run bench` | no | Measured round trip, both schemes |
+| `npm run test:protocol` | **yes** | End-to-end protocol tests |
+| `npm run test:actions` | **yes** | Every button reports success or failure honestly |
+| `npm run test:spaces` | no | Fires the Spaces shortcuts directly at the helper |
+| `npm run test:keydiff` | no | Real keystroke versus synthetic, side by side |
+
 ---
 
 ## Project layout
@@ -2101,6 +2162,8 @@ host/capabilities.js     what this host actually is and can do, plus the
                          honest native/mapped/none gesture list
 host/discovery.js        Bonjour advertise and browse
 host/native/mdinput.swift  posts real input via CGEventPost; coalesces bursts
+host/native/keywatch.swift listen-only event tap, for comparing a real
+                         keystroke with a synthetic one
 host/native/build.sh     compiles it with swiftc
 
 public/index.html        the app shell — every screen, present from the start
@@ -2108,7 +2171,7 @@ public/app.js            gestures, air pointer, board, editor, keyboards, panes
 public/catalog.js        209 macOS + 120 Windows built-in shortcuts
 public/style.css         design tokens, both layouts, the pointer UI
 public/manifest.webmanifest   Home Screen icon and standalone display
-public/icons/            app icons
+public/icons/            app icons (180 / 192 / 512 px)
 
 test/console.mjs         terminal-console tests (starts its own server)
 test/persistence.mjs     a save is never claimed unless it happened
@@ -2116,6 +2179,8 @@ test/latency.mjs         measured round trip, both schemes
 test/protocol.mjs        end-to-end protocol tests (needs a live server)
 test/actions.mjs         every button reports success or failure honestly
 test/press.mjs           hand tool: press one board button from the CLI
+test/spaces.mjs          fires the Spaces shortcuts straight at the helper
+test/keydiff.mjs         real keystroke vs synthetic, flag by flag
 
 docs/TASKS.md            work log
 docs/research/           background research: accessibility and TCC, discovery

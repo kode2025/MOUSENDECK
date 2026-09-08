@@ -13,7 +13,8 @@ board.json.tmp
 # Self-signed TLS material, regenerated automatically per machine.
 certs/
 
-# Compiled Swift helper; rebuild with `npm run build`.
+# Compiled Swift binaries; rebuilt on demand.
 host/native/mdinput
+host/native/keywatch
 host/native/*.dSYM/
 
